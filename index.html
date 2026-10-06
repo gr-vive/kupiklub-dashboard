@@ -177,6 +177,11 @@ svg text{font-family:inherit}
 .loss .lk{color:var(--ink-2)}
 .loss .lm{grid-column:1/-1;font-size:11.5px;color:var(--ink-3);margin-top:-4px;padding-bottom:6px;border-bottom:1px solid var(--line)}
 .loss .lm:last-child{border-bottom:0}
+.corner{position:fixed;top:12px;right:16px;z-index:40;display:flex;gap:8px;align-items:center}
+.backbtn{all:unset;cursor:pointer;display:inline-flex;align-items:center;gap:6px;background:var(--surface);border:1px solid var(--line-2);border-radius:999px;padding:6px 14px 6px 12px;font-size:12.5px;font-weight:500;color:var(--ink);box-shadow:0 2px 10px rgba(0,0,0,.08)}
+.backbtn:hover{border-color:var(--accent);color:var(--accent-ink)}
+.backbtn .bk{color:var(--ink-3);font-weight:400}
+.backbtn:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
 .mobbtn{all:unset;display:none;cursor:pointer;border:1px solid var(--line-2);border-radius:8px;padding:6px 12px;font-size:12.5px;background:var(--surface);color:var(--ink-2)}
 .pfdot{display:inline-block;width:9px;height:9px;border-radius:3px;margin-right:6px;vertical-align:-1px}
 .empty{padding:28px 0;text-align:center;color:var(--ink-3);font-size:13px}
@@ -333,7 +338,7 @@ const state={
   targets:{cpc:150,cpm:60,cpo:1500},
   f:{platform:[],product:[],dest:[],campaign:[],scenario:[],blogger:''},
   dim:'platform', paretoBy:'video',
-  sort:{}, page:1,
+  sort:{}, page:1, hist:[],
   sel:{blogger:null,video:null,product:'acne'},
   cols:{platform:true,product:true,scenario:true,dest:true,blogger:true,campaign:false,account:false,date:true,days:true,budget:true,views:true,clicks:true,orders:false,likes:false,comments:false,reposts:false,saves:false}
 };
@@ -717,8 +722,11 @@ function activeFilterChips(){
 }
 function topbar(title,sub){
   const chips=activeFilterChips();
-  return `<div class="topbar"><div class="tt"><h1>${title}</h1><div class="sub">${sub}</div>${chips?`<div class="active-filters">${chips}</div>`:''}</div><button type="button" class="mobbtn" data-act="togglesb">Фильтры</button></div>`;
+  const prev=state.hist.length?state.hist[state.hist.length-1]:null;
+  const back=prev?`<button type="button" class="backbtn" data-act="back" title="Вернуться на предыдущий экран (Esc)">← Назад <span class="bk">${SCREEN_NAME[prev.screen]}</span></button>`:'';
+  return `<div class="topbar"><div class="tt"><h1>${title}</h1><div class="sub">${sub}</div>${chips?`<div class="active-filters">${chips}</div>`:''}</div><div class="corner">${back}<button type="button" class="mobbtn" data-act="togglesb">Фильтры</button></div></div>`;
 }
+const SCREEN_NAME={overview:'Обзор',drivers:'Драйверы',products:'Товары',bloggers:'Блогеры',videos:'Ролики'};
 const TAGC={loss:'var(--crit-text)',scale:'var(--good-text)',review:'var(--warn-text)',stop:'var(--crit-text)',info:'var(--series-budget)'};
 const PARETO_NOUN={video:'роликов',blogger:'блогеров',scenario:'сценариев',product:'товаров'};
 
@@ -999,6 +1007,12 @@ function render(){
   renderSidebar();
 }
 
+// ---------- navigation history (for the Back button) ----------
+function snapshot(){return {screen:state.screen,dim:state.dim,paretoBy:state.paretoBy,page:state.page,sel:Object.assign({},state.sel),sort:JSON.parse(JSON.stringify(state.sort)),f:JSON.parse(JSON.stringify(state.f)),scroll:window.scrollY}}
+function pushHist(){state.hist.push(snapshot());if(state.hist.length>30)state.hist.shift()}
+function goBack(){const s=state.hist.pop();if(!s)return;state.screen=s.screen;state.dim=s.dim;state.paretoBy=s.paretoBy;state.page=s.page;state.sel=s.sel;state.sort=s.sort;state.f=s.f;render();window.scrollTo(0,s.scroll||0)}
+document.addEventListener('keydown',e=>{if(e.key==='Escape'&&state.hist.length&&!e.target.closest('input,select'))goBack()});
+
 // ---------- events ----------
 document.addEventListener('click',e=>{
   const th=e.target.closest('th[data-sort]');
@@ -1006,7 +1020,8 @@ document.addEventListener('click',e=>{
   const el=e.target.closest('[data-act]');if(!el)return;
   const a=el.dataset.act,v=el.dataset.v;
   switch(a){
-    case 'screen':state.screen=v;state.page=1;window.scrollTo(0,0);break;
+    case 'screen':if(v===state.screen)return;pushHist();state.screen=v;state.page=1;window.scrollTo(0,0);break;
+    case 'back':goBack();return;
     case 'togglesb':document.getElementById('sidebar').classList.toggle('open');return;
     case 'goal':state.goal=v;state.sort={};break;
     case 'preset':{const n=+v;state.preset=n;state.end=LAST;state.start=LAST-n+1;break}
@@ -1019,11 +1034,11 @@ document.addEventListener('click',e=>{
     case 'selProduct':state.sel.product=v;break;
     case 'selBlogger':state.sel.blogger=v||null;break;
     case 'selVideo':state.sel.video=v||null;break;
-    case 'openVideo':state.sel.video=v;state.screen='videos';window.scrollTo(0,0);break;
+    case 'openVideo':pushHist();state.sel.video=v;state.screen='videos';window.scrollTo(0,0);break;
     case 'col':state.cols[v]=!state.cols[v];break;
     case 'page':state.page=+v;break;
     case 'go':{
-      const ins=(state._insights||[])[+el.dataset.i];if(!ins)return;const go=ins.go;
+      const ins=(state._insights||[])[+el.dataset.i];if(!ins)return;const go=ins.go;pushHist();
       state.screen=go.screen;if(go.dim)state.dim=go.dim;
       if(go.f){for(const k in go.f)state.f[k]=go.f[k].slice()}
       if(go.sort)state.sort[go.screen]=Object.assign({},go.sort);
