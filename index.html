@@ -229,6 +229,7 @@ svg text{font-family:inherit}
 .verdictbar.good{background:var(--good-soft);color:var(--good-text)}.verdictbar.bad{background:var(--crit-soft);color:var(--crit-text)}.verdictbar.flat{background:var(--warn-soft);color:var(--warn-text)}
 .verdictbar .dot{width:12px;height:12px;border-radius:50%;background:currentColor;flex:none}
 .sumgrid.four{grid-template-columns:repeat(4,minmax(0,1fr))}
+.sumgrid.five{grid-template-columns:repeat(5,minmax(0,1fr))}
 .sum .v small{font-size:15px;color:var(--ink-3);font-weight:400}
 .srows,.prows{display:flex;flex-direction:column;gap:2px}
 .srow{display:grid;grid-template-columns:150px 1fr 150px;gap:8px 12px;align-items:center;font-size:13px;padding:8px;margin:0 -8px;border-radius:8px}
@@ -237,8 +238,8 @@ svg text{font-family:inherit}
 .srow .sc,.prow .sc{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap;display:flex;gap:6px;justify-content:flex-end;align-items:center}
 .prow{display:grid;grid-template-columns:1fr auto 150px;gap:8px 12px;align-items:center;font-size:13px;padding:8px;margin:0 -8px;border-radius:8px}
 .srow.rowbtn,.prow.rowbtn{cursor:pointer}.srow.rowbtn:hover,.prow.rowbtn:hover{background:var(--surface-2)}
-@media(max-width:1180px){.sumgrid.four{grid-template-columns:repeat(2,minmax(0,1fr))}.sumgrid.four .sum:nth-child(3){border-left:0}.sumgrid.four .sum:nth-child(4){border-left:1px solid var(--line)}.sumgrid.four .sum:nth-child(n+3){border-top:1px solid var(--line)}}
-@media(max-width:900px){.srow{grid-template-columns:110px 1fr 120px}.prow{grid-template-columns:1fr auto 120px}}
+@media(max-width:1180px){.sumgrid.five{grid-template-columns:repeat(3,minmax(0,1fr))}.sumgrid.four{grid-template-columns:repeat(2,minmax(0,1fr))}.sumgrid.four .sum:nth-child(3){border-left:0}.sumgrid.four .sum:nth-child(4){border-left:1px solid var(--line)}.sumgrid.four .sum:nth-child(n+3){border-top:1px solid var(--line)}}
+@media(max-width:900px){.sumgrid.five{grid-template-columns:repeat(2,minmax(0,1fr))}.srow{grid-template-columns:110px 1fr 120px}.prow{grid-template-columns:1fr auto 120px}}
 .fchain{grid-column:span 12;display:grid;grid-template-columns:1fr auto 1fr auto 1fr auto 1fr auto 1fr;background:var(--surface);border:1px solid var(--line);border-radius:12px;overflow:hidden}
 .fstage{padding:12px 14px 12px;display:flex;flex-direction:column;gap:4px;min-width:0}
 .fstage.goal{background:var(--accent-soft)}.fstage.goal .v,.fstage.goal .l{color:var(--accent-ink)}
@@ -1266,9 +1267,10 @@ function tiles4(s,p){
   const has=p.n>0;const g=G();
   const d=(k,key)=>has?dpill(s[k],p[k],key):pill('muted','нет базы');
   const was=(k,f)=>has?`<span class="w">было ${f(p[k])}</span>`:'';
-  return `<div class="sumgrid four">
+  return `<div class="sumgrid five">
     <div class="sum"><div class="l">Потратили</div><div class="v">${money(s.budget)}</div><div class="d">${d('budget','neutral')}${was('budget',money)}</div></div>
-    <div class="sum ${g.result==='views'?'goal':''}"><div class="l">Роликов · охват</div><div class="v">${fmt(s.n)} <small>·</small> ${fmtK(s.views)}</div><div class="d">${d('n','neutral')}${d('views','views')}${has?`<span class="w">было ${fmt(p.n)} · ${fmtK(p.views)}</span>`:''}</div></div>
+    <div class="sum"><div class="l">Роликов вышло</div><div class="v">${fmt(s.n)}</div><div class="d">${d('n','neutral')}${was('n',fmt)}</div></div>
+    <div class="sum ${g.result==='views'?'goal':''}"><div class="l">Охват, просмотры</div><div class="v">${fmtK(s.views)}</div><div class="d">${d('views','views')}${was('views',fmtK)}</div></div>
     <div class="sum ${g.result==='clicks'?'goal':''}"><div class="l">Переходов</div><div class="v">${fmt(s.clicks)}</div><div class="d">${d('clicks','clicks')}${was('clicks',fmt)}</div></div>
     <div class="sum ${g.result==='orders'?'goal':''}"><div class="l">Заказов</div><div class="v">${fmt(s.orders)}</div><div class="d">${d('orders','orders')}${was('orders',fmt)}</div></div>
   </div>`;
