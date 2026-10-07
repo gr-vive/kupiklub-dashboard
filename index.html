@@ -209,6 +209,22 @@ svg text{font-family:inherit}
 .card .rows{display:grid;grid-template-columns:1fr auto auto;gap:5px 12px;font-size:12.5px;align-items:baseline}
 .card .rows .k{color:var(--ink-2)}.card .rows .w{color:var(--ink-3);font-size:11.5px;text-align:right;white-space:nowrap}.card .rows .c{text-align:right;font-variant-numeric:tabular-nums;font-weight:500}
 @media(max-width:900px){.cmp{grid-template-columns:90px 1fr 120px 90px}.cmp .conv{padding-left:0}.fs-conv{padding-left:0}}
+.sumgrid{grid-column:span 12;display:grid;grid-template-columns:repeat(6,minmax(0,1fr));background:var(--surface);border:1px solid var(--line);border-radius:12px;overflow:hidden}
+.sum{padding:14px 18px 16px;border-left:1px solid var(--line);display:flex;flex-direction:column;gap:5px;min-width:0}
+.sum:first-child{border-left:0}
+.sum .l{font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-3);font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sum .v{font-size:24px;font-weight:600;letter-spacing:-.02em;line-height:1.15}
+.sum.goal .v{color:var(--accent-ink)}
+.sum .d{display:flex;align-items:center;gap:6px 8px;font-size:11.5px;flex-wrap:wrap}.sum .d .w{color:var(--ink-3);white-space:nowrap}
+.sum .pbars{display:flex;flex-direction:column;gap:3px;margin-top:4px}
+.sum .pbar{height:7px;border-radius:4px;min-width:2px}.sum .pbar.now{background:var(--series-result)}.sum .pbar.was{background:var(--line-2)}
+.sumlegend{grid-column:1/-1;display:flex;gap:14px;font-size:11px;color:var(--ink-3);padding:8px 18px 10px;border-top:1px solid var(--line)}
+.sumlegend span::before{content:"";display:inline-block;width:10px;height:7px;border-radius:3px;margin-right:6px;background:var(--c)}
+.effrow{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap}
+.effk{font-weight:600;font-size:14px}.effk .note{margin-left:8px;font-weight:400}
+.effv{font-size:22px;font-weight:600;letter-spacing:-.02em;margin-left:auto}
+@media(max-width:1180px){.sumgrid{grid-template-columns:repeat(3,minmax(0,1fr))}.sum:nth-child(4){border-left:0}.sum:nth-child(n+4){border-top:1px solid var(--line)}}
+@media(max-width:900px){.sumgrid{grid-template-columns:repeat(2,minmax(0,1fr))}.sum:nth-child(odd){border-left:0}.sum:nth-child(n+3){border-top:1px solid var(--line)}}
 </style>
 </head>
 <body>
@@ -1067,9 +1083,53 @@ function cmpFunnel(s,p){
   return h+'</div><div class="legend"><span style="--c:var(--series-result)">этот период</span><span style="--c:var(--line-2)">прошлый период</span></div>';
 }
 function mini(cur,prev,max){return `<div class="mini"><div class="mb cur" style="width:${(max?cur/max*100:0).toFixed(1)}%"></div><div class="mb prev" style="width:${(max&&prev!=null?prev/max*100:0).toFixed(1)}%"></div></div>`}
+function effSentence(s,p){
+  const g=G();const has=p.n>0;const cB=has?chg(s.budget,p.budget):null,cC=has?chg(s[g.cost],p[g.cost]):null;
+  if(s[g.cost]==null)return `<span class="bad">${g.resultLabel} в этом периоде нет</span>, ${g.costLabel} посчитать нельзя.`;
+  if(cC==null)return has?`В прошлом периоде результата не было, сравнить ${g.costLabel} не с чем.`:'Прошлого периода для сравнения нет.';
+  const n=fmt(Math.abs(cC)*100,0);
+  const bud=cB==null?'':Math.abs(cB)<=.1?' при том же бюджете':cB>0?` при бюджете на ${fmt(cB*100,0)}% больше`:` при бюджете на ${fmt(-cB*100,0)}% меньше`;
+  if(cC<=-.05)return `<span class="good">Эффективность выросла</span>${bud}: результат на ${n}% дешевле, чем в прошлом периоде.`;
+  if(cC>=.05)return `<span class="bad">Эффективность снизилась</span>${bud}: результат на ${n}% дороже, чем в прошлом периоде.`;
+  return `Эффективность на прежнем уровне${bud}.`;
+}
+function sumTiles(s,p){
+  const has=p.n>0;const g=G();
+  const items=[{k:'budget',l:'Потратили',f:money,key:'neutral'},{k:'n',l:'Роликов вышло',f:fmt,key:'neutral'},{k:'views',l:'Охват, просмотры',f:fmtK,key:'views'},{k:'clicks',l:'Переходов',f:fmt,key:'clicks'},{k:'orders',l:'Заказов',f:fmt,key:'orders'},{k:'revenue',l:'Выручка',f:money,key:'revenue'}];
+  return `<div class="sumgrid">${items.map(x=>{const cur=s[x.k]||0,pv=has?p[x.k]:null;const max=Math.max(cur,pv||0,1e-9);
+    return `<div class="sum ${x.k===g.result?'goal':''}"><div class="l">${x.l}</div><div class="v">${x.f(cur)}</div><div class="d">${dpill(cur,pv,x.key)}<span class="w">было ${pv==null?'—':x.f(pv)}</span></div><div class="pbars"><div class="pbar now" style="width:${(cur/max*100).toFixed(1)}%" data-tip="${esc('этот период: '+x.f(cur))}"></div><div class="pbar was" style="width:${pv==null?0:(pv/max*100).toFixed(1)}%" data-tip="${esc('прошлый период: '+(pv==null?'—':x.f(pv)))}"></div></div></div>`}).join('')}
+    <div class="sumlegend"><span style="--c:var(--series-result)">этот период</span><span style="--c:var(--line-2)">прошлый период</span></div></div>`;
+}
+function dumbbell({now,was,target,fmtV,lowerBetter,W=520,H=82}){
+  const padL=20,padR=20,y=46,iw=W-padL-padR;
+  const vals=[now,was,target].filter(v=>v!=null&&isFinite(v));
+  if(now==null||!vals.length)return '<div class="empty">Результата в периоде нет</div>';
+  const max=Math.max(...vals)*1.18;const X=v=>padL+iw*v/max;
+  let s=`<svg viewBox="0 0 ${W} ${H}" width="100%" style="height:auto;display:block" role="img" aria-label="было и стало">`;
+  s+=`<line x1="${padL}" x2="${W-padR}" y1="${y}" y2="${y}" class="axis"/>`;
+  if(target!=null)s+=`<line x1="${X(target).toFixed(1)}" x2="${X(target).toFixed(1)}" y1="${y-16}" y2="${y+16}" stroke="var(--ink-2)" stroke-dasharray="3 2"/><text class="lbl" x="${X(target).toFixed(1)}" y="${y-24}" text-anchor="middle">цель ${fmtV(target)}</text>`;
+  if(was!=null){
+    const better=lowerBetter?now<=was:now>=was;const flat=Math.abs(now-was)/Math.abs(was||1)<.02;const col=flat?'var(--ink-3)':better?'var(--good-text)':'var(--crit-text)';
+    s+=`<line x1="${X(was).toFixed(1)}" x2="${X(now).toFixed(1)}" y1="${y}" y2="${y}" stroke="${col}" stroke-width="6" stroke-linecap="round"/>`;
+    s+=`<circle cx="${X(was).toFixed(1)}" cy="${y}" r="7" fill="var(--line-2)" stroke="var(--surface)" stroke-width="2" data-tip="${esc('прошлый период: '+fmtV(was))}"/>`;
+    s+=`<text class="lbl2" x="${X(was).toFixed(1)}" y="${y+30}" text-anchor="middle">было ${fmtV(was)}</text>`;
+  }
+  s+=`<circle cx="${X(now).toFixed(1)}" cy="${y}" r="8" fill="var(--series-result)" stroke="var(--surface)" stroke-width="2" data-tip="${esc('этот период: '+fmtV(now))}"/>`;
+  const nowAnchor=was!=null&&Math.abs(X(now)-X(was))<70?(X(now)>=X(was)?'start':'end'):'middle';
+  s+=`<text class="lbl3" x="${X(now).toFixed(1)}" y="${y-12}" text-anchor="${nowAnchor}">сейчас ${fmtV(now)}</text>`;
+  return s+'</svg>';
+}
+function effCard(s,p){
+  const g=G();const has=p.n>0;const t=state.targets[g.target];
+  const cost=s[g.cost],pcost=has?p[g.cost]:null,eff=s[g.eff],peff=has?p[g.eff]:null;
+  return `<div class="effrow"><div class="effk">${g.costLabel}<span class="note">стоимость одного результата, меньше = лучше</span></div><div class="effv">${costSpan(cost)}</div>${dpill(cost,pcost,g.cost)}</div>
+    ${dumbbell({now:cost,was:pcost,target:t,fmtV:v=>mf(g.cost,v),lowerBetter:true})}
+    <div class="effrow"><div class="effk">${g.effLabel}<span class="note">результата на просмотр, больше = лучше</span></div><div class="effv">${mf(g.eff,eff)}</div>${dpill(eff,peff,g.eff)}</div>
+    ${dumbbell({now:eff,was:peff,target:null,fmtV:v=>mf(g.eff,v),lowerBetter:false})}
+    <div class="verdict" style="font-size:15px">${effSentence(s,p)}</div>`;
+}
 function renderExec(ctx){
   const {sum,prev,recs,prevRecs,len}=ctx;const g=G();const has=prev.n>0;
-  const verdict=execVerdict(sum,prev);
   const mv=movers(recs,prevRecs);
   state._insights=mv.map(m=>({go:m.screen==='products'?{screen:'products',product:m.key}:{screen:'drivers',dim:m.dim}}));
   const mvHtml=mv.length?`<div class="insights">${mv.map((m,i)=>{const up=m.d>0;const cc=m.cur[g.cost],pc=m.prev?m.prev[g.cost]:null;return `<button type="button" class="insight" data-act="go" data-i="${i}"><span class="stripe" style="--c:${up?'var(--good-text)':'var(--crit-text)'}"></span><span><div class="t">${DIMS[m.dim].label} «${esc(m.name)}»</div><div class="m">${g.costLabel} ${mf(g.cost,cc)}${pc!=null?' против '+mf(g.cost,pc):''} · ${m.cur.n} ${plural(m.cur.n,'ролик','ролика','роликов')}${m.prev?' (было '+m.prev.n+')':''}</div></span><span class="impact">${g.resultGen}<b style="color:${up?'var(--good-text)':'var(--crit-text)'}">${up?'+':'−'}${fmt(Math.abs(m.d))}</b></span></button>`}).join('')}</div>`:'<div class="empty">Нет изменений относительно прошлого периода</div>';
@@ -1103,7 +1163,8 @@ function renderExec(ctx){
   const ps=state.start-len,pe=state.start-1;
   const sub=`${fmtDL(state.start)} – ${fmtDL(state.end)}${has?` против ${fmtDL(Math.max(0,ps))} – ${fmtDL(pe)}`:' · прошлого периода для сравнения нет'} · ${state.mode==='calendar'?'календарный режим':'по дате выхода, '+state.cp+' дн.'}`;
   return topbar('Бизнес-обзор',sub)+`<div class="grid">
-    ${card('Итог за период',`<div class="verdict">${verdict.map(s=>`<div>${s}</div>`).join('')}</div>`,{span:7,hint:'в сравнении с прошлым периодом той же длины'})}
+    ${sumTiles(sum,prev)}
+    ${card('Эффективность',effCard(sum,prev),{span:7,hint:'сейчас против прошлого периода · пунктир: цель клиента'})}
     ${card('Что изменило картину',mvHtml,{span:5,hint:'куда копать дальше · клик открывает детали'})}
     ${card('Воронка: этот и прошлый период',cmpFunnel(sum,prev),{span:12,hint:'между ступенями: CPM, ER, CTR, CR, ДРР'})}
     ${card('Товары: что рекламировать',prodTbl,{span:12,hint:'серая полоска: прошлый период · клик по строке открывает товар'})}
