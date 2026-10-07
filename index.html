@@ -254,6 +254,8 @@ function fmtD(i){const d=dateOf(i);return d.getUTCDate()+' '+MONTHS_S[d.getUTCMo
 function fmtDL(i){const d=dateOf(i);return d.getUTCDate()+' '+MONTHS_G[d.getUTCMonth()]}
 function isoOf(i){return dateOf(i).toISOString().slice(0,10)}
 function dayOfIso(s){const t=Date.UTC(+s.slice(0,4),+s.slice(5,7)-1,+s.slice(8,10));return Math.round((t-DATA_START)/86400000)}
+function monthStartIdx(i){const d=dateOf(i);return Math.round((Date.UTC(d.getUTCFullYear(),d.getUTCMonth(),1)-DATA_START)/86400000)}
+function monthEndIdx(i){const d=dateOf(i);return Math.round((Date.UTC(d.getUTCFullYear(),d.getUTCMonth()+1,0)-DATA_START)/86400000)}
 function rangeLabel(s,e){const ds=dateOf(s),de=dateOf(e);return ds.getUTCMonth()===de.getUTCMonth()?`${ds.getUTCDate()}–${fmtD(e)}`:`${fmtD(s)} – ${fmtD(e)}`}
 
 // ---------- seeded random ----------
@@ -377,6 +379,7 @@ const state={
   screen:'exec',
   start:48, end:78,          // 6 Sep – 6 Oct
   preset:31,
+  cmp:null,                  // comparison range override {start,end}; null = previous period of the same length
   mode:'calendar', cp:7,
   goal:'clicks',
   targets:{cpc:150,cpm:60,cpo:1500},
@@ -434,12 +437,13 @@ function filteredVideos(){
   const f=state.f;
   return videos.filter(v=>(!f.platform.length||f.platform.includes(v.platform))&&(!f.product.length||f.product.includes(v.product))&&(!f.dest.length||f.dest.includes(v.dest))&&(!f.campaign.length||f.campaign.includes(v.campaign))&&(!f.scenario.length||f.scenario.includes(v.scenario))&&(!f.offer.length||f.offer.includes(v.offer))&&(!f.blogger||v.blogger===f.blogger));
 }
+function cmpRange(){const len=state.end-state.start+1;if(state.cmp)return {ps:state.cmp.start,pe:state.cmp.end};return {ps:state.start-len,pe:state.start-1}}
 function compute(){
   const vs=filteredVideos();
-  const len=state.end-state.start+1;
+  const len=state.end-state.start+1;const {ps,pe}=cmpRange();
   const recs=vs.map(v=>recOf(v,state.start,state.end,state.mode,state.cp)).filter(r=>r.inc);
-  const prevRecs=state.start-len>=-LIFE?vs.map(v=>recOf(v,state.start-len,state.start-1,state.mode,state.cp)).filter(r=>r.inc):[];
-  return {vs,recs,prevRecs,sum:sumRecs(recs),prev:sumRecs(prevRecs),len};
+  const prevRecs=pe>=0?vs.map(v=>recOf(v,ps,pe,state.mode,state.cp)).filter(r=>r.inc):[];
+  return {vs,recs,prevRecs,sum:sumRecs(recs),prev:sumRecs(prevRecs),len,ps,pe};
 }
 function groupBy(recs,keyFn){
   const m=new Map();
@@ -756,7 +760,7 @@ function periodText(){
     ?`${fmtDL(state.start)} – ${fmtDL(state.end)}, ${len} дн., календарный режим`
     :`ролики, вышедшие ${fmtDL(state.start)} – ${fmtDL(state.end)}, первые ${state.cp} дн. жизни каждого`;
 }
-function prevText(ctx){const s=state.start-ctx.len,e=state.start-1;return ctx.prev.n?`сравнение с ${fmtD(Math.max(0,s))} – ${fmtD(e)}`:'для сравнения нет прошлого периода'}
+function prevText(ctx){return ctx.prev.n?`сравнение с ${fmtD(Math.max(0,ctx.ps))} – ${fmtD(ctx.pe)}`:'для сравнения нет прошлого периода'}
 function activeFilterChips(){
   const f=state.f;const out=[];
   const add=(k,label,vals,name=x=>x)=>{for(const v of vals)out.push(`<button type="button" class="af" data-act="unfilter" data-k="${k}" data-v="${esc(v)}" title="Убрать фильтр">${label}: <b>${esc(name(v))}</b> ✕</button>`)};
@@ -1160,7 +1164,7 @@ function renderExec(ctx){
       <div class="fs-conv" style="padding-left:0">${chip('CPM','cpm')}${chip('CTR','ctr')}${chip('CR','cr')}${chip('ER','er')}</div>
       <div class="flabel">Типы офферов</div><div class="sublist">${offers.map(o=>`<div class="it"><span>${esc(o.key)}<div class="note">${o.s.n} ${plural(o.s.n,'ролик','ролика','роликов')} · ${pct(o.bShare)} бюджета площадки</div></span><span class="n">${fmt(o.result)} ${g.resultGen} · ${g.costLabel} ${mf(g.cost,o.cost)}</span></div>`).join('')}</div>`,{span:4,hint:p?'':'прошлого периода нет'});
   }).join('');
-  const ps=state.start-len,pe=state.start-1;
+  const {ps,pe}=ctx;
   const sub=`${fmtDL(state.start)} – ${fmtDL(state.end)}${has?` против ${fmtDL(Math.max(0,ps))} – ${fmtDL(pe)}`:' · прошлого периода для сравнения нет'} · ${state.mode==='calendar'?'календарный режим':'по дате выхода, '+state.cp+' дн.'}`;
   return topbar('Бизнес-обзор',sub)+`<div class="grid">
     ${sumTiles(sum,prev)}
@@ -1180,9 +1184,10 @@ function renderSidebar(){
   const f=state.f;const g=G();
   const chips=(k,items,name=x=>x)=>`<div class="chips">${items.map(v=>`<button type="button" class="chip ${f[k].includes(v)?'on':''}" data-act="chip" data-k="${k}" data-v="${esc(v)}" aria-pressed="${f[k].includes(v)}">${esc(name(v))}</button>`).join('')}</div>`;
   const bl=bloggers.slice().sort((a,b)=>a.name.localeCompare(b.name));
+  const cr=cmpRange();const cmpNote=`Сравнение с ${fmtD(Math.max(0,cr.ps))} – ${fmtD(cr.pe)}${state.preset==='month'?': те же дни прошлого месяца':state.preset==='prevmonth'?': полный предыдущий месяц':': предыдущий период той же длины'}`;
   document.getElementById('filters').innerHTML=`<div class="fwrap">
     <div class="fsec"><div class="flabel">Главная метрика клиента</div>${seg([{v:'clicks',l:'Переходы'},{v:'reach',l:'Охват'},{v:'orders',l:'Заказы'}],state.goal,'goal','full')}<div class="note">Результат: ${g.resultLabel.toLowerCase()} · стоимость: ${g.costLabel} · эффективность: ${g.effLabel}</div></div>
-    <div class="fsec"><div class="flabel">Период</div>${seg([{v:7,l:'7 дн.'},{v:14,l:'14 дн.'},{v:31,l:'31 дн.'}],state.preset,'preset','full')}<div class="row2"><input type="date" data-act="start" value="${isoOf(state.start)}" min="${isoOf(0)}" max="${isoOf(LAST)}" aria-label="Начало периода"><input type="date" data-act="end" value="${isoOf(state.end)}" min="${isoOf(0)}" max="${isoOf(LAST)}" aria-label="Конец периода"></div><div class="note">Данные демо: 20 июля – 6 октября 2026</div></div>
+    <div class="fsec"><div class="flabel">Период</div>${seg([{v:'month',l:'Текущий месяц'},{v:'prevmonth',l:'Прошлый месяц'}],state.preset,'preset','full')}${seg([{v:7,l:'7 дн.'},{v:14,l:'14 дн.'},{v:31,l:'31 дн.'}],state.preset,'preset','full')}<div class="row2"><input type="date" data-act="start" value="${isoOf(state.start)}" min="${isoOf(0)}" max="${isoOf(LAST)}" aria-label="Начало периода"><input type="date" data-act="end" value="${isoOf(state.end)}" min="${isoOf(0)}" max="${isoOf(LAST)}" aria-label="Конец периода"></div><div class="note">${cmpNote}</div><div class="note">Данные демо: 20 июля – 6 октября 2026</div></div>
     <div class="fsec"><div class="flabel">Режим</div>${seg([{v:'calendar',l:'Календарь'},{v:'cohort',l:'По дате выхода'}],state.mode,'mode','full')}<div class="tgt"><span>Точка</span><input type="number" data-act="cp" value="${state.cp}" min="1" max="30" step="1" aria-label="Контрольная точка, дней"></div><div class="note">${state.mode==='calendar'?'Что происходило в эти даты. Контрольная точка нужна для статуса «ноль после точки».':'Ролики, вышедшие в период, и первые N дней жизни каждого.'}</div></div>
     <div class="fsec"><div class="flabel">Цели клиента</div><div class="tgt"><span class="${g.target==='cpc'?'on':''}">CPC</span><input type="number" data-act="target" data-k="cpc" value="${state.targets.cpc}" min="1" step="10" aria-label="Целевой CPC"><span class="${g.target==='cpm'?'on':''}">CPM</span><input type="number" data-act="target" data-k="cpm" value="${state.targets.cpm}" min="1" step="5" aria-label="Целевой CPM"><span class="${g.target==='cpo'?'on':''}">CPO</span><input type="number" data-act="target" data-k="cpo" value="${state.targets.cpo}" min="1" step="50" aria-label="Целевой CPO"></div><div class="note">Статусы и подсветка считаются от цели активной метрики.</div></div>
     <div class="fsec"><div class="flabel">Площадка</div>${chips('platform',PLATFORMS)}</div>
@@ -1221,7 +1226,11 @@ document.addEventListener('click',e=>{
     case 'back':goBack();return;
     case 'togglesb':document.getElementById('sidebar').classList.toggle('open');return;
     case 'goal':state.goal=v;state.sort={};break;
-    case 'preset':{const n=+v;state.preset=n;state.end=LAST;state.start=LAST-n+1;break}
+    case 'preset':{
+      if(v==='month'){const ms=monthStartIdx(LAST);state.start=ms;state.end=LAST;const pms=monthStartIdx(ms-1);state.cmp={start:pms,end:Math.min(pms+(LAST-ms),monthEndIdx(ms-1))};state.preset='month'}
+      else if(v==='prevmonth'){const ms=monthStartIdx(LAST);const pe=ms-1,ps=monthStartIdx(pe);state.start=ps;state.end=pe;state.cmp={start:monthStartIdx(ps-1),end:ps-1};state.preset='prevmonth'}
+      else{const n=+v;state.preset=n;state.end=LAST;state.start=LAST-n+1;state.cmp=null}
+      state.page=1;break}
     case 'mode':state.mode=v;break;
     case 'chip':{const arr=state.f[el.dataset.k];const i=arr.indexOf(v);if(i>=0)arr.splice(i,1);else arr.push(v);state.page=1;break}
     case 'unfilter':{const k=el.dataset.k;if(k==='blogger')state.f.blogger='';else{const arr=state.f[k];const i=arr.indexOf(v);if(i>=0)arr.splice(i,1)}state.page=1;break}
@@ -1250,8 +1259,8 @@ document.addEventListener('click',e=>{
 document.addEventListener('change',e=>{
   const el=e.target.closest('[data-act]');if(!el)return;
   switch(el.dataset.act){
-    case 'start':{const d=dayOfIso(el.value);if(!isNaN(d)){state.start=clamp(d,0,state.end);state.preset=null}break}
-    case 'end':{const d=dayOfIso(el.value);if(!isNaN(d)){state.end=clamp(d,state.start,LAST);state.preset=null}break}
+    case 'start':{const d=dayOfIso(el.value);if(!isNaN(d)){state.start=clamp(d,0,state.end);state.preset=null;state.cmp=null}break}
+    case 'end':{const d=dayOfIso(el.value);if(!isNaN(d)){state.end=clamp(d,state.start,LAST);state.preset=null;state.cmp=null}break}
     case 'cp':state.cp=clamp(parseInt(el.value,10)||7,1,30);break;
     case 'target':state.targets[el.dataset.k]=Math.max(1,parseFloat(el.value)||1);break;
     case 'blogger':state.f.blogger=el.value;state.page=1;break;
