@@ -225,6 +225,20 @@ svg text{font-family:inherit}
 .effv{font-size:22px;font-weight:600;letter-spacing:-.02em;margin-left:auto}
 @media(max-width:1180px){.sumgrid{grid-template-columns:repeat(3,minmax(0,1fr))}.sum:nth-child(4){border-left:0}.sum:nth-child(n+4){border-top:1px solid var(--line)}}
 @media(max-width:900px){.sumgrid{grid-template-columns:repeat(2,minmax(0,1fr))}.sum:nth-child(odd){border-left:0}.sum:nth-child(n+3){border-top:1px solid var(--line)}}
+.verdictbar{grid-column:span 12;display:flex;align-items:center;gap:12px;padding:14px 18px;border-radius:12px;font-size:16px;font-weight:500;line-height:1.4}
+.verdictbar.good{background:var(--good-soft);color:var(--good-text)}.verdictbar.bad{background:var(--crit-soft);color:var(--crit-text)}.verdictbar.flat{background:var(--warn-soft);color:var(--warn-text)}
+.verdictbar .dot{width:12px;height:12px;border-radius:50%;background:currentColor;flex:none}
+.sumgrid.four{grid-template-columns:repeat(4,minmax(0,1fr))}
+.sum .v small{font-size:15px;color:var(--ink-3);font-weight:400}
+.srows,.prows{display:flex;flex-direction:column;gap:2px}
+.srow{display:grid;grid-template-columns:150px 1fr 150px;gap:8px 12px;align-items:center;font-size:13px;padding:8px;margin:0 -8px;border-radius:8px}
+.srow .sl{min-width:0}
+.srow .bars{display:flex;flex-direction:column;gap:3px}.srow .bar{height:8px;border-radius:4px;min-width:2px}.srow .bar.b{background:var(--series-budget)}.srow .bar.r{background:var(--series-result)}
+.srow .sc,.prow .sc{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap;display:flex;gap:6px;justify-content:flex-end;align-items:center}
+.prow{display:grid;grid-template-columns:1fr auto 150px;gap:8px 12px;align-items:center;font-size:13px;padding:8px;margin:0 -8px;border-radius:8px}
+.srow.rowbtn,.prow.rowbtn{cursor:pointer}.srow.rowbtn:hover,.prow.rowbtn:hover{background:var(--surface-2)}
+@media(max-width:1180px){.sumgrid.four{grid-template-columns:repeat(2,minmax(0,1fr))}.sumgrid.four .sum:nth-child(3){border-left:0}.sumgrid.four .sum:nth-child(4){border-left:1px solid var(--line)}.sumgrid.four .sum:nth-child(n+3){border-top:1px solid var(--line)}}
+@media(max-width:900px){.srow{grid-template-columns:110px 1fr 120px}.prow{grid-template-columns:1fr auto 120px}}
 </style>
 </head>
 <body>
@@ -379,13 +393,14 @@ const LOWER_BETTER=new Set(['cpc','cpm','cpo','drr']);
 
 // ---------- state ----------
 const state={
-  screen:'exec',
+  screen:'exec2',
   start:48, end:78,          // 6 Sep – 6 Oct
   preset:31,
   cmp:null,                  // comparison range override {start,end}; null = previous period of the same length
   mode:'calendar', cp:7,
   goal:'clicks',
-  split:'auto',              // main comparison on the business overview
+  split:'auto',
+  moreFilters:false,         // sidebar: analytic filters collapsed on the business overview              // main comparison on the business overview
   targets:{cpc:150,cpm:60,cpo:1500},
   f:{platform:[],product:[],dest:[],channel:[],stream:[],scenario:[],offer:[],blogger:''},
   dim:'platform', paretoBy:'video',
@@ -791,7 +806,7 @@ function topbar(title,sub){
   const back=prev?`<button type="button" class="backbtn" data-act="back" title="Вернуться на предыдущий экран (Esc)">← Назад <span class="bk">${SCREEN_NAME[prev.screen]}</span></button>`:'';
   return `<div class="topbar"><div class="tt"><h1>${title}</h1><div class="sub">${sub}</div>${chips?`<div class="active-filters">${chips}</div>`:''}</div><div class="corner">${back}<button type="button" class="mobbtn" data-act="togglesb">Фильтры</button></div></div>`;
 }
-const SCREEN_NAME={exec:'Бизнес-обзор',overview:'Обзор',drivers:'Драйверы',products:'Товары',bloggers:'Блогеры',videos:'Ролики'};
+const SCREEN_NAME={exec2:'Бизнес-обзор (простой)',exec:'Бизнес-обзор (подробный)',overview:'Обзор',drivers:'Драйверы',products:'Товары',bloggers:'Блогеры',videos:'Ролики'};
 const TAGC={loss:'var(--crit-text)',scale:'var(--good-text)',review:'var(--warn-text)',stop:'var(--crit-text)',info:'var(--series-budget)'};
 const PARETO_NOUN={video:'роликов',blogger:'блогеров',scenario:'сценариев',product:'товаров'};
 
@@ -1202,7 +1217,7 @@ function renderExec(ctx){
     splitHtml=card(`${dimLabel}: топ-5 по ${g.resultDat} и остальные`,table(cmpCols(g,mB,mR,dimLabel,false),list,{screen:'execsplit'}),{span:12,hint:'серая полоска: прошлый период · полный список на экране «'+(dim==='blogger'?'Блогеры':'Драйверы')+'»'});
   }
   const {ps,pe}=ctx;
-  const sub=`${fmtDL(state.start)} – ${fmtDL(state.end)}${has?` против ${fmtDL(Math.max(0,ps))} – ${fmtDL(pe)}`:' · прошлого периода для сравнения нет'} · ${state.mode==='calendar'?'календарный режим':'по дате выхода, '+state.cp+' дн.'}`;
+  const sub=`подробная версия · ${fmtDL(state.start)} – ${fmtDL(state.end)}${has?` против ${fmtDL(Math.max(0,ps))} – ${fmtDL(pe)}`:' · прошлого периода для сравнения нет'} · ${state.mode==='calendar'?'календарный режим':'по дате выхода, '+state.cp+' дн.'}`;
   return topbar('Бизнес-обзор',sub)+`<div class="grid">
     ${sumTiles(sum,prev)}
     ${card('Эффективность',effCard(sum,prev),{span:7,hint:'сейчас против прошлого периода · пунктир: цель клиента'})}
@@ -1215,18 +1230,91 @@ function renderExec(ctx){
 }
 </script>
 <script>
+// ---------- screen: business overview v2 (simple, one screen) ----------
+const RES_PLURAL={clicks:['переход','перехода','переходов'],views:['просмотр','просмотра','просмотров'],orders:['заказ','заказа','заказов']};
+const UNIT_WORD={clicks:'переход',views:'1000 просмотров',orders:'заказ'};
+const cap=s=>s.charAt(0).toUpperCase()+s.slice(1);
+function joinRu(a){return a.length<=1?a.join(''):a.slice(0,-1).join(', ')+' и '+a[a.length-1]}
+function verdictBar(s,p){
+  const g=G();const has=p.n>0;const t=state.targets[g.target];const cost=s[g.cost];
+  let cls='flat',text='';
+  if(cost==null){cls='bad';text=`${g.resultLabel} в этом периоде нет: ${g.costLabel} посчитать нельзя`}
+  else if(!has||p[g.cost]==null){text=`${cap(UNIT_WORD[g.result])} стоит ${mf(g.cost,cost)}${has?', в прошлом периоде результата не было':', прошлого периода для сравнения нет'}`}
+  else{
+    const cC=chg(cost,p[g.cost]),cB=chg(s.budget,p.budget);const n=fmt(Math.abs(cC)*100,0);
+    cls=cC<=-.05?'good':cC>=.05?'bad':'flat';
+    const head=cC<=-.05?`Эффективность выросла на ${n}%`:cC>=.05?`Эффективность снизилась на ${n}%`:'Эффективность без изменений';
+    text=`${head}: ${UNIT_WORD[g.result]} стоит ${mf(g.cost,cost)} вместо ${mf(g.cost,p[g.cost])}, бюджет ${cB==null?'—':(cB>=0?'+':'−')+fmt(Math.abs(cB)*100,0)+'%'}`;
+  }
+  const tgt=cost==null?'':cost<=t?` · в пределах цели ${mf(g.cost,t)}`:` · выше цели ${mf(g.cost,t)}`;
+  return `<div class="verdictbar ${cls}"><span class="dot" aria-hidden="true"></span><span>${text}${tgt}</span></div>`;
+}
+function tiles4(s,p){
+  const has=p.n>0;const g=G();
+  const d=(k,key)=>has?dpill(s[k],p[k],key):pill('muted','нет базы');
+  const was=(k,f)=>has?`<span class="w">было ${f(p[k])}</span>`:'';
+  return `<div class="sumgrid four">
+    <div class="sum"><div class="l">Потратили</div><div class="v">${money(s.budget)}</div><div class="d">${d('budget','neutral')}${was('budget',money)}</div></div>
+    <div class="sum ${g.result==='views'?'goal':''}"><div class="l">Роликов · охват</div><div class="v">${fmt(s.n)} <small>·</small> ${fmtK(s.views)}</div><div class="d">${d('n','neutral')}${d('views','views')}${has?`<span class="w">было ${fmt(p.n)} · ${fmtK(p.views)}</span>`:''}</div></div>
+    <div class="sum ${g.result==='clicks'?'goal':''}"><div class="l">Переходов</div><div class="v">${fmt(s.clicks)}</div><div class="d">${d('clicks','clicks')}${was('clicks',fmt)}</div></div>
+    <div class="sum ${g.result==='orders'?'goal':''}"><div class="l">Заказов</div><div class="v">${fmt(s.orders)}</div><div class="d">${d('orders','orders')}${was('orders',fmt)}</div></div>
+  </div>`;
+}
+function splitSimple(ctx){
+  const {sum,recs,prevRecs}=ctx;const g=G();
+  const dim=resolveSplit(recs);const dimLabel=DIMS[dim].label;
+  const spv=new Map(groupBy(prevRecs,DIMS[dim].key).map(x=>[x.key,x.s]));
+  const sg=enrich(groupBy(recs,DIMS[dim].key),sum).sort((a,b)=>b.result-a.result);
+  let rows=sg,restRow=null;
+  if(sg.length>5){
+    const rest=sg.slice(5);rows=sg.slice(0,5);
+    const rl=rest.flatMap(x=>x.list);const keys=new Set(rest.map(x=>x.key));
+    restRow=enrich([{key:'rest',list:rl,s:sumRecs(rl)}],sum)[0];restRow.name=`Остальные (${rest.length})`;
+    const pr=prevRecs.filter(x=>keys.has(DIMS[dim].key(x.v)));restRow.prev=pr.length?sumRecs(pr):null;
+  }
+  const max=Math.max(...sg.map(x=>Math.max(x.bShare,x.rShare)),1e-9);
+  const row=x=>{
+    const p=x.key==='rest'?x.prev:(spv.get(x.key)||null);const pc=p?p[g.cost]:null;const isRest=x.key==='rest';
+    return `<div class="srow ${isRest?'':'rowbtn'}"${isRest?'':` data-act="goDrivers" data-v="${dim}"`}><div class="sl">${dim==='platform'?pfDot(x.key):''}${esc(x.name||dimName(dim,x.key))}<div class="note">${x.s.n} ${plural(x.s.n,'ролик','ролика','роликов')} · ${pct(x.bShare)} бюджета</div></div><div class="bars"><div class="bar b" style="width:${(x.bShare/max*100).toFixed(1)}%" data-tip="${esc('доля бюджета '+pct(x.bShare))}"></div><div class="bar r" style="width:${(x.rShare/max*100).toFixed(1)}%" data-tip="${esc('доля '+g.resultGen+' '+pct(x.rShare))}"></div></div><div class="sc">${x.result?`${costSpan(x.cost)} ${dpill(x.cost,pc,g.cost)}`:`<span class="down">0 ${g.resultGen}</span>`}</div></div>`;
+  };
+  const title=sg.length<=3?joinRu(sg.map(x=>dimName(dim,x.key))):dimLabel;
+  return card(esc(title),`<div class="srows">${rows.map(row).join('')}${restRow?row(restRow):''}</div><div class="legend"><span style="--c:var(--series-budget)">доля бюджета</span><span style="--c:var(--series-result)">доля ${g.resultGen}</span></div><div class="note">Главный разрез: ${dimLabel.toLowerCase()}${state.split==='auto'?' (авто)':''} · справа ${g.costLabel} и его изменение · клик открывает «Драйверы»</div>`,{span:7,hint:'куда ушли деньги и что они принесли'});
+}
+function productsSimple(ctx){
+  const {sum,recs,prevRecs}=ctx;const g=G();
+  const pv=new Map(groupBy(prevRecs,v=>v.product).map(x=>[x.key,x.s]));
+  const prods=enrich(groupBy(recs,v=>v.product),sum).sort((a,b)=>b.s.budget-a.s.budget);
+  return card('Товары: что делать',`<div class="prows">${prods.map(x=>{const p=pv.get(x.key)||null;return `<div class="prow rowbtn" data-act="goProduct" data-v="${x.key}"><div>${esc(PRODUCT_BY_ID[x.key].short)}<span class="note"> · ${x.s.n} рол.</span></div><div>${pill(DECISION[x.status][1],DECISION[x.status][0])}</div><div class="sc">${x.result?`${costSpan(x.cost)} ${dpill(x.cost,p?p[g.cost]:null,g.cost)}`:`<span class="down">0 ${g.resultGen}</span>`}</div></div>`}).join('')}</div><div class="note">${g.costLabel} и его изменение к прошлому периоду · клик открывает товар</div>`,{span:5});
+}
+function reasonsSimple(ctx){
+  const g=G();const mv=movers(ctx.recs,ctx.prevRecs).slice(0,3);
+  state._insights=mv.map(m=>({go:m.screen==='products'?{screen:'products',product:m.key}:{screen:'drivers',dim:m.dim}}));
+  const pl=RES_PLURAL[g.result];
+  const body=mv.length?`<div class="insights">${mv.map((m,i)=>{const up=m.d>0;const cc=m.cur[g.cost],pc=m.prev?m.prev[g.cost]:null;const n=Math.abs(m.d);
+    return `<button type="button" class="insight" data-act="go" data-i="${i}"><span class="stripe" style="--c:${up?'var(--good-text)':'var(--crit-text)'}"></span><span><span class="t">${DIMS[m.dim].label} «${esc(m.name)}»</span> <span class="${up?'good':'bad'}">${up?'+':'−'}${fmt(n)} ${plural(n,pl[0],pl[1],pl[2])}</span><span class="m" style="display:inline;margin-left:10px">${g.costLabel} ${mf(g.cost,cc)}${pc!=null?' против '+mf(g.cost,pc):''}</span></span></button>`}).join('')}</div>`:'<div class="empty">Изменений относительно прошлого периода нет</div>';
+  return card('Что изменило картину',body,{span:12,hint:'три главные причины · клик ведёт вглубь'});
+}
+function renderExec2(ctx){
+  const {sum,prev,ps,pe}=ctx;const has=prev.n>0;
+  const sub=`простая версия · ${fmtDL(state.start)} – ${fmtDL(state.end)}${has?` против ${fmtDL(Math.max(0,ps))} – ${fmtDL(pe)}`:' · прошлого периода для сравнения нет'}`;
+  return topbar('Бизнес-обзор',sub)+`<div class="grid">${verdictBar(sum,prev)}${tiles4(sum,prev)}${splitSimple(ctx)}${productsSimple(ctx)}${reasonsSimple(ctx)}</div>`;
+}
+</script>
+<script>
 // ---------- sidebar ----------
 function renderSidebar(){
-  const nav=[['exec','Бизнес-обзор','★'],['overview','Обзор','◎'],['drivers','Драйверы','⇄'],['products','Товары','▣'],['bloggers','Блогеры','◉'],['videos','Ролики','▤']];
+  const nav=[['exec2','Бизнес-обзор · простой','★'],['exec','Бизнес-обзор · подробный','☆'],['overview','Обзор','◎'],['drivers','Драйверы','⇄'],['products','Товары','▣'],['bloggers','Блогеры','◉'],['videos','Ролики','▤']];
   document.getElementById('nav').innerHTML=nav.map(([k,l,ic])=>`<button type="button" class="${state.screen===k?'active':''}" data-act="screen" data-v="${k}"><span class="ic" aria-hidden="true">${ic}</span>${l}</button>`).join('');
   const f=state.f;const g=G();
   const chips=(k,items,name=x=>x)=>`<div class="chips">${items.map(v=>`<button type="button" class="chip ${f[k].includes(v)?'on':''}" data-act="chip" data-k="${k}" data-v="${esc(v)}" aria-pressed="${f[k].includes(v)}">${esc(name(v))}</button>`).join('')}</div>`;
   const bl=bloggers.slice().sort((a,b)=>a.name.localeCompare(b.name));
   const cr=cmpRange();const cmpNote=`Сравнение с ${fmtD(Math.max(0,cr.ps))} – ${fmtD(cr.pe)}${state.preset==='month'?': те же дни прошлого месяца':state.preset==='prevmonth'?': полный предыдущий месяц':': предыдущий период той же длины'}`;
-  document.getElementById('filters').innerHTML=`<div class="fwrap">
-    <div class="fsec"><div class="flabel">Главная метрика клиента</div>${seg([{v:'clicks',l:'Переходы'},{v:'reach',l:'Охват'},{v:'orders',l:'Заказы'}],state.goal,'goal','full')}<div class="note">Результат: ${g.resultLabel.toLowerCase()} · стоимость: ${g.costLabel} · эффективность: ${g.effLabel}</div></div>
-    <div class="fsec"><div class="flabel">Главный разрез</div>${seg(SPLIT_OPTIONS.map(([v,l])=>({v,l})),state.split,'split','full')}<div class="note">Единственное сравнение на бизнес-обзоре. Авто: направление, если их несколько, иначе площадка, оффер, блогер.</div></div>
-    <div class="fsec"><div class="flabel">Период</div>${seg([{v:'month',l:'Текущий месяц'},{v:'prevmonth',l:'Прошлый месяц'}],state.preset,'preset','full')}${seg([{v:7,l:'7 дн.'},{v:14,l:'14 дн.'},{v:31,l:'31 дн.'}],state.preset,'preset','full')}<div class="row2"><input type="date" data-act="start" value="${isoOf(state.start)}" min="${isoOf(0)}" max="${isoOf(LAST)}" aria-label="Начало периода"><input type="date" data-act="end" value="${isoOf(state.end)}" min="${isoOf(0)}" max="${isoOf(LAST)}" aria-label="Конец периода"></div><div class="note">${cmpNote}</div><div class="note">Данные демо: 20 июля – 6 октября 2026</div></div>
+  const onExec=state.screen==='exec'||state.screen==='exec2';const simple=onExec&&!state.moreFilters;
+  const periodSec=`<div class="fsec"><div class="flabel">Период</div>${seg([{v:'month',l:'Текущий месяц'},{v:'prevmonth',l:'Прошлый месяц'}],state.preset,'preset','full')}${seg([{v:7,l:'7 дн.'},{v:14,l:'14 дн.'},{v:31,l:'31 дн.'}],state.preset,'preset','full')}<div class="row2"><input type="date" data-act="start" value="${isoOf(state.start)}" min="${isoOf(0)}" max="${isoOf(LAST)}" aria-label="Начало периода"><input type="date" data-act="end" value="${isoOf(state.end)}" min="${isoOf(0)}" max="${isoOf(LAST)}" aria-label="Конец периода"></div><div class="note">${cmpNote}</div><div class="note">Данные демо: 20 июля – 6 октября 2026</div></div>`;
+  const goalSec=`<div class="fsec"><div class="flabel">Главная метрика клиента</div>${seg([{v:'clicks',l:'Переходы'},{v:'reach',l:'Охват'},{v:'orders',l:'Заказы'}],state.goal,'goal','full')}<div class="note">Результат: ${g.resultLabel.toLowerCase()} · стоимость: ${g.costLabel} · эффективность: ${g.effLabel}</div></div>`;
+  const splitSec=onExec?`<div class="fsec"><div class="flabel">Главный разрез</div>${seg(SPLIT_OPTIONS.map(([v,l])=>({v,l})),state.split,'split','full')}<div class="note">Единственное сравнение на бизнес-обзоре. Авто: направление, если их несколько, иначе площадка, оффер, блогер.</div></div>`:'';
+  const toggle=onExec?`<div class="fsec"><button type="button" class="linkbtn" data-act="morefilters">${state.moreFilters?'Скрыть фильтры для аналитики':'Фильтры для аналитики ▸'}</button></div>`:'';
+  const analytic=`
     <div class="fsec"><div class="flabel">Режим</div>${seg([{v:'calendar',l:'Календарь'},{v:'cohort',l:'По дате выхода'}],state.mode,'mode','full')}<div class="tgt"><span>Точка</span><input type="number" data-act="cp" value="${state.cp}" min="1" max="30" step="1" aria-label="Контрольная точка, дней"></div><div class="note">${state.mode==='calendar'?'Что происходило в эти даты. Контрольная точка нужна для статуса «ноль после точки».':'Ролики, вышедшие в период, и первые N дней жизни каждого.'}</div></div>
     <div class="fsec"><div class="flabel">Цели клиента</div><div class="tgt"><span class="${g.target==='cpc'?'on':''}">CPC</span><input type="number" data-act="target" data-k="cpc" value="${state.targets.cpc}" min="1" step="10" aria-label="Целевой CPC"><span class="${g.target==='cpm'?'on':''}">CPM</span><input type="number" data-act="target" data-k="cpm" value="${state.targets.cpm}" min="1" step="5" aria-label="Целевой CPM"><span class="${g.target==='cpo'?'on':''}">CPO</span><input type="number" data-act="target" data-k="cpo" value="${state.targets.cpo}" min="1" step="50" aria-label="Целевой CPO"></div><div class="note">Статусы и подсветка считаются от цели активной метрики.</div></div>
     <div class="fsec"><div class="flabel">Площадка</div>${chips('platform',PLATFORMS)}</div>
@@ -1237,14 +1325,14 @@ function renderSidebar(){
     <div class="fsec"><div class="flabel">Сценарий</div>${chips('scenario',SCENARIOS.map(s=>s.name))}</div>
     <div class="fsec"><div class="flabel">Оффер</div>${chips('offer',OFFERS.map(o=>o.name))}</div>
     <div class="fsec"><div class="flabel">Блогер</div><select data-act="blogger" aria-label="Блогер"><option value="">Все блогеры</option>${bl.map(b=>`<option value="${esc(b.name)}" ${f.blogger===b.name?'selected':''}>${esc(b.name)}</option>`).join('')}</select></div>
-    <div class="fsec"><button type="button" class="linkbtn" data-act="reset">Сбросить фильтры</button></div>
-  </div>`;
+    <div class="fsec"><button type="button" class="linkbtn" data-act="reset">Сбросить фильтры</button></div>`;
+  document.getElementById('filters').innerHTML=`<div class="fwrap">${periodSec}${goalSec}${splitSec}${toggle}${simple?'':analytic}</div>`;
 }
 
 // ---------- render ----------
 function render(){
   const ctx=compute();
-  const fn={exec:renderExec,overview:renderOverview,drivers:renderDrivers,products:renderProducts,bloggers:renderBloggers,videos:renderVideos}[state.screen]||renderOverview;
+  const fn={exec2:renderExec2,exec:renderExec,overview:renderOverview,drivers:renderDrivers,products:renderProducts,bloggers:renderBloggers,videos:renderVideos}[state.screen]||renderOverview;
   document.getElementById('main').innerHTML=fn(ctx);
   renderSidebar();
 }
@@ -1267,6 +1355,8 @@ document.addEventListener('click',e=>{
     case 'togglesb':document.getElementById('sidebar').classList.toggle('open');return;
     case 'goal':state.goal=v;state.sort={};break;
     case 'split':state.split=v;break;
+    case 'morefilters':state.moreFilters=!state.moreFilters;break;
+    case 'goDrivers':pushHist();state.dim=v;state.screen='drivers';window.scrollTo(0,0);break;
     case 'preset':{
       if(v==='month'){const ms=monthStartIdx(LAST);state.start=ms;state.end=LAST;const pms=monthStartIdx(ms-1);state.cmp={start:pms,end:Math.min(pms+(LAST-ms),monthEndIdx(ms-1))};state.preset='month'}
       else if(v==='prevmonth'){const ms=monthStartIdx(LAST);const pe=ms-1,ps=monthStartIdx(pe);state.start=ps;state.end=pe;state.cmp={start:monthStartIdx(ps-1),end:ps-1};state.preset='prevmonth'}
