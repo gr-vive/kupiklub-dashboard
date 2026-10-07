@@ -300,7 +300,9 @@ const OFFERS=[
   {name:'Скидка на набор',  ctr:1.0, cr:1.0, w:.20},
   {name:'Без оффера',       ctr:.7,  cr:.8,  w:.25}
 ];
-const CAMPAIGNS=['Сетка','Марафон, поток 1','Марафон, поток 2','Марафон, поток 3','Марафон, поток 4','Марафон, поток 5'];
+const CHANNELS=['Сетка','Марафон'];                       // направление: two parallel streams of work
+const STREAMS=['Поток 1','Поток 2','Поток 3','Поток 4','Поток 5']; // поток: marathon cohorts
+const CH={'Сетка':{ctr:1.15,budget:1.0},'Марафон':{ctr:.9,budget:.7}};
 const HANDLES=['@mila.skincare','@dasha_glow','@nastya.derma','@kate.routine','@alina_beauty','@sonya.skin','@lera.acne','@polina_face',
   '@vika.care','@masha.derm','@ksenia.glow','@olga.beauty','@yana_skin','@anna.routine','@liza.derma','@sveta_care',
   '@rita.glow','@diana.skin','@ulyana_beauty','@nika.face','@arina.derm','@tanya_glow','@zhenya.skin','@kira.care',
@@ -311,10 +313,11 @@ const bloggers=HANDLES.map((h,i)=>{
   const platform=pickW(PLATFORMS,[.55,.3,.15]);
   const q=clamp(Math.exp(gauss()*.7),.15,3.4);           // quality: drives CTR
   const act=Math.exp(gauss()*.55);                        // activity: how many videos
-  const campaign=rnd()<.4?'Сетка':'Марафон, поток '+(1+Math.floor(rnd()*5));
+  const channel=rnd()<.4?'Сетка':'Марафон';
+  const stream=channel==='Сетка'?'Сетка, без потока':'Поток '+(1+Math.floor(rnd()*5));
   const accounts=[{name:h,platform}];
   if(i%4===0){const other=PLATFORMS.filter(p=>p!==platform);const p2=pickW(other,[1,1]);accounts.push({name:h+(p2==='Instagram'?'.ig':p2==='TikTok'?'.tt':'.yt'),platform:p2})}
-  return {id:i,name:h,platform,q,act,campaign,accounts};
+  return {id:i,name:h,platform,q,act,channel,stream,accounts};
 });
 
 // ---------- videos ----------
@@ -335,7 +338,7 @@ const videos=[];
     let dest=pickW(DESTS,[.70,.22,.08]);
     if(day>=LAST-3&&rnd()<.5)dest='Нет ссылки';
     const [b0,b1]=PF[pf].budget;
-    const budget=Math.round((b0+rnd()*(b1-b0))*(b.q>1.6?1.35:b.q<.5?.8:1)/10)*10;
+    const budget=Math.round((b0+rnd()*(b1-b0))*(b.q>1.6?1.35:b.q<.5?.8:1)*CH[b.channel].budget/10)*10;
     const viral=rnd()<.02;
     let total=Math.round(Math.exp(Math.log(380)+1.0*gauss())*PF[pf].views*sc.views*Math.pow(b.q,.4)*(viral?25+rnd()*120:1));
     total=Math.max(40,total);
@@ -347,7 +350,7 @@ const videos=[];
     total=tot;
     // clicks: saturating CTR (viral videos convert worse)
     const eff=total<=3000?total:3000+Math.pow(total-3000,.6);
-    const ctr=.00085*PF[pf].ctr*sc.ctr*prod.ctr*of.ctr*b.q*(dest==='Своя ссылка'?1:dest==='Ozon'?.8:0);
+    const ctr=.00085*PF[pf].ctr*sc.ctr*prod.ctr*of.ctr*CH[b.channel].ctr*b.q*(dest==='Своя ссылка'?1:dest==='Ozon'?.8:0);
     const clicks=poisson(eff*ctr);
     const cD=new Float64Array(LIFE);const w2=w.map((x,d)=>x*Math.exp(d/(tau*4)));
     for(let k=0;k<clicks;k++){cD[pickW(dayIdx.slice(0,LIFE),w2)]++}
@@ -358,7 +361,7 @@ const videos=[];
     const comments=Math.round(total*.0006*(.5+rnd())*sc.eng);
     const reposts=Math.round(total*.012*(.5+rnd())*sc.eng);
     const saves=Math.round(total*.0022*(.5+rnd())*sc.eng);
-    rows.push({day,platform:pf,product:prod.id,scenario:sc.name,offer:of.name,dest,campaign:b.campaign,blogger:b.name,account:acc.name,
+    rows.push({day,platform:pf,product:prod.id,scenario:sc.name,offer:of.name,dest,channel:b.channel,stream:b.stream,blogger:b.name,account:acc.name,
       budget,total,clicks,orders,revenue:orders*prod.price,price:prod.price,vD,cD,oD,likes,comments,reposts,saves,viral});
   }
   rows.sort((a,b)=>a.day-b.day);
@@ -367,9 +370,9 @@ const videos=[];
 
 // ---------- goal configuration ----------
 const GOALS={
-  clicks:{label:'Переходы', result:'clicks', resultLabel:'Переходы', resultGen:'переходов', cost:'cpc', costLabel:'CPC', eff:'ctr', effLabel:'CTR на 10k', target:'cpc', daily:'cD'},
-  reach: {label:'Охват',    result:'views',  resultLabel:'Просмотры', resultGen:'просмотров', cost:'cpm', costLabel:'CPM', eff:'er',  effLabel:'ER', target:'cpm', daily:'vD'},
-  orders:{label:'Заказы',   result:'orders', resultLabel:'Заказы',   resultGen:'заказов',   cost:'cpo', costLabel:'CPO', eff:'cr',  effLabel:'CR', target:'cpo', daily:'oD'}
+  clicks:{label:'Переходы', result:'clicks', resultLabel:'Переходы', resultGen:'переходов', resultDat:'переходам', cost:'cpc', costLabel:'CPC', eff:'ctr', effLabel:'CTR на 10k', target:'cpc', daily:'cD'},
+  reach: {label:'Охват',    result:'views',  resultLabel:'Просмотры', resultGen:'просмотров', resultDat:'просмотрам', cost:'cpm', costLabel:'CPM', eff:'er',  effLabel:'ER', target:'cpm', daily:'vD'},
+  orders:{label:'Заказы',   result:'orders', resultLabel:'Заказы',   resultGen:'заказов', resultDat:'заказам',   cost:'cpo', costLabel:'CPO', eff:'cr',  effLabel:'CR', target:'cpo', daily:'oD'}
 };
 const METRIC_LABEL={budget:'Бюджет',views:'Просмотры',clicks:'Переходы',orders:'Заказы',revenue:'Выручка',cpc:'CPC',cpm:'CPM',cpo:'CPO',ctr:'CTR на 10k',cr:'CR',er:'ER',drr:'ДРР',n:'Роликов',likes:'Лайки',comments:'Комментарии',reposts:'Репосты',saves:'Сохранения'};
 const LOWER_BETTER=new Set(['cpc','cpm','cpo','drr']);
@@ -382,12 +385,13 @@ const state={
   cmp:null,                  // comparison range override {start,end}; null = previous period of the same length
   mode:'calendar', cp:7,
   goal:'clicks',
+  split:'auto',              // main comparison on the business overview
   targets:{cpc:150,cpm:60,cpo:1500},
-  f:{platform:[],product:[],dest:[],campaign:[],scenario:[],offer:[],blogger:''},
+  f:{platform:[],product:[],dest:[],channel:[],stream:[],scenario:[],offer:[],blogger:''},
   dim:'platform', paretoBy:'video',
   sort:{}, page:1, hist:[],
   sel:{blogger:null,video:null,product:'acne'},
-  cols:{platform:true,product:true,scenario:true,offer:false,dest:true,blogger:true,campaign:false,account:false,date:true,days:true,budget:true,views:true,clicks:true,orders:false,likes:false,comments:false,reposts:false,saves:false}
+  cols:{platform:true,product:true,scenario:true,offer:false,dest:true,blogger:true,channel:false,stream:false,account:false,date:true,days:true,budget:true,views:true,clicks:true,orders:false,likes:false,comments:false,reposts:false,saves:false}
 };
 const G=()=>GOALS[state.goal];
 
@@ -435,7 +439,7 @@ function sumRecs(recs){
 }
 function filteredVideos(){
   const f=state.f;
-  return videos.filter(v=>(!f.platform.length||f.platform.includes(v.platform))&&(!f.product.length||f.product.includes(v.product))&&(!f.dest.length||f.dest.includes(v.dest))&&(!f.campaign.length||f.campaign.includes(v.campaign))&&(!f.scenario.length||f.scenario.includes(v.scenario))&&(!f.offer.length||f.offer.includes(v.offer))&&(!f.blogger||v.blogger===f.blogger));
+  return videos.filter(v=>(!f.platform.length||f.platform.includes(v.platform))&&(!f.product.length||f.product.includes(v.product))&&(!f.dest.length||f.dest.includes(v.dest))&&(!f.channel.length||f.channel.includes(v.channel))&&(!f.stream.length||f.stream.includes(v.stream))&&(!f.scenario.length||f.scenario.includes(v.scenario))&&(!f.offer.length||f.offer.includes(v.offer))&&(!f.blogger||v.blogger===f.blogger));
 }
 function cmpRange(){const len=state.end-state.start+1;if(state.cmp)return {ps:state.cmp.start,pe:state.cmp.end};return {ps:state.start-len,pe:state.start-1}}
 function compute(){
@@ -456,10 +460,22 @@ const DIMS={
   scenario:{label:'Сценарий',key:v=>v.scenario},
   offer:{label:'Оффер',key:v=>v.offer},
   dest:{label:'Куда ведёт',key:v=>v.dest},
-  campaign:{label:'Кампания',key:v=>v.campaign},
+  channel:{label:'Направление',key:v=>v.channel},
+  stream:{label:'Поток',key:v=>v.stream},
   account:{label:'Аккаунт',key:v=>v.account},
   blogger:{label:'Блогер',key:v=>v.blogger}
 };
+const SPLIT_OPTIONS=[['auto','Авто'],['channel','Направление'],['platform','Площадка'],['offer','Оффер'],['blogger','Блогер'],['product','Товар'],['scenario','Сценарий']];
+const SUB_DIM={channel:'stream',platform:'offer',offer:'platform',blogger:'product',product:'platform',scenario:'platform',stream:'platform'};
+const SUB_GEN={stream:'потокам',platform:'площадкам',offer:'офферам',product:'товарам',scenario:'сценариям',blogger:'блогерам',channel:'направлениям'};
+function resolveSplit(recs){
+  if(state.split!=='auto')return state.split;
+  const cnt=dim=>new Set(recs.map(r=>DIMS[dim].key(r.v))).size;
+  if(cnt('channel')>=2)return 'channel';
+  if(cnt('platform')>=2)return 'platform';
+  if(cnt('offer')>=2)return 'offer';
+  return 'blogger';
+}
 function dimName(dim,key){const d=DIMS[dim];return d.name?d.name(key):key}
 function enrich(groups,total){
   const g0=G();const t=state.targets[g0.target];
@@ -764,7 +780,7 @@ function prevText(ctx){return ctx.prev.n?`сравнение с ${fmtD(Math.max(
 function activeFilterChips(){
   const f=state.f;const out=[];
   const add=(k,label,vals,name=x=>x)=>{for(const v of vals)out.push(`<button type="button" class="af" data-act="unfilter" data-k="${k}" data-v="${esc(v)}" title="Убрать фильтр">${label}: <b>${esc(name(v))}</b> ✕</button>`)};
-  add('platform','Площадка',f.platform);add('product','Товар',f.product,k=>PRODUCT_BY_ID[k].short);add('dest','Куда ведёт',f.dest);add('campaign','Кампания',f.campaign);add('scenario','Сценарий',f.scenario);add('offer','Оффер',f.offer);
+  add('platform','Площадка',f.platform);add('product','Товар',f.product,k=>PRODUCT_BY_ID[k].short);add('dest','Куда ведёт',f.dest);add('channel','Направление',f.channel);add('stream','Поток',f.stream);add('scenario','Сценарий',f.scenario);add('offer','Оффер',f.offer);
   if(f.blogger)out.push(`<button type="button" class="af" data-act="unfilter" data-k="blogger" data-v="">Блогер: <b>${esc(f.blogger)}</b> ✕</button>`);
   if(out.length)out.push(`<button type="button" class="linkbtn" data-act="reset">Сбросить все</button>`);
   return out.join('');
@@ -924,10 +940,10 @@ function renderProducts(ctx){
 // ---------- screen: bloggers ----------
 function renderBloggers(ctx){
   const {sum,recs}=ctx;const g=G();
-  const groups=enrich(groupBy(recs,v=>v.blogger),sum).map(x=>{const b=bloggers.find(bb=>bb.name===x.key);return Object.assign(x,{name:x.key,n:x.s.n,budget:x.s.budget,platforms:[...new Set(x.list.map(r=>r.v.platform))],campaign:b?b.campaign:''})});
+  const groups=enrich(groupBy(recs,v=>v.blogger),sum).map(x=>{const b=bloggers.find(bb=>bb.name===x.key);return Object.assign(x,{name:x.key,n:x.s.n,budget:x.s.budget,platforms:[...new Set(x.list.map(r=>r.v.platform))],campaign:b?(b.channel+(b.stream.startsWith('Поток')?', '+b.stream:'')):''})});
   const cols=[
     {k:'name',l:'Блогер',render:r=>`${r.platforms.map(pfDot).join('')}${esc(r.name)}`},
-    {k:'campaign',l:'Кампания'},
+    {k:'campaign',l:'Направление'},
     {k:'n',l:'Роликов',num:true},
     {k:'budget',l:'Бюджет',num:true,render:r=>money(r.budget)},
     {k:'result',l:g.resultLabel,num:true,render:r=>fmt(r.result)},
@@ -949,7 +965,7 @@ function renderBloggers(ctx){
     const x=groups.find(y=>y.key===state.sel.blogger);
     if(x){
       const wk=weekly(dailyTotals(x.list));const byP=enrich(groupBy(x.list,v=>v.product),x.s);
-      detail=card('Блогер '+esc(x.key),`<div class="kv"><div><div class="k">Кампания</div><div class="v">${esc(x.campaign)}</div></div><div><div class="k">Площадки</div><div class="v">${x.platforms.join(', ')}</div></div><div><div class="k">Роликов</div><div class="v">${x.n}</div></div><div><div class="k">Бюджет</div><div class="v">${money(x.budget)}</div></div><div><div class="k">${g.resultLabel}</div><div class="v">${fmt(x.result)}</div></div><div><div class="k">${g.costLabel}</div><div class="v">${mf(g.cost,x.cost)}</div></div><div><div class="k">С результатом</div><div class="v">${pct(x.hit)}</div></div><div><div class="k">Статус</div><div class="v">${statusPill(x.status)}</div></div></div>
+      detail=card('Блогер '+esc(x.key),`<div class="kv"><div><div class="k">Направление</div><div class="v">${esc(x.campaign)}</div></div><div><div class="k">Площадки</div><div class="v">${x.platforms.join(', ')}</div></div><div><div class="k">Роликов</div><div class="v">${x.n}</div></div><div><div class="k">Бюджет</div><div class="v">${money(x.budget)}</div></div><div><div class="k">${g.resultLabel}</div><div class="v">${fmt(x.result)}</div></div><div><div class="k">${g.costLabel}</div><div class="v">${mf(g.cost,x.cost)}</div></div><div><div class="k">С результатом</div><div class="v">${pct(x.hit)}</div></div><div><div class="k">Статус</div><div class="v">${statusPill(x.status)}</div></div></div>
         <div class="two"><div><div class="flabel" style="margin-bottom:6px">${g.resultLabel} по неделям</div>${columns({vals:wk.map(w=>w[g.result]),labels:wk.map(w=>w.label),W:460,H:170,fmtV:fmtK})}</div><div><div class="flabel" style="margin-bottom:8px">По товарам</div><div class="sublist">${byP.map(y=>`<div class="it"><span>${PRODUCT_BY_ID[y.key].short}</span><span class="n">${y.s.n} рол. · ${fmt(y.result)} ${g.resultGen} · ${mf(g.cost,y.cost)}</span></div>`).join('')}</div></div></div>
         <div class="flabel">Лучшие ролики блогера</div>${videoTable(x.list,'bdet',{compact:true,limit:8})}`,{span:12,act:`<button type="button" class="linkbtn" data-act="selBlogger" data-v="">Закрыть</button>`});
     }
@@ -965,7 +981,7 @@ function renderBloggers(ctx){
 // ---------- screen: videos ----------
 function vrows(recs){
   const g=G();
-  return recs.map(r=>({rec:r,v:r.v,art:r.v.art,day:r.v.day,product:PRODUCT_BY_ID[r.v.product].short,scenario:r.v.scenario,offer:r.v.offer,platform:r.v.platform,blogger:r.v.blogger,account:r.v.account,campaign:r.v.campaign,dest:r.v.dest,daysIn:r.daysIn,budget:r.budget,views:r.views,clicks:r.clicks,orders:r.orders,likes:r.likes,comments:r.comments,reposts:r.reposts,saves:r.saves,result:r[g.result],cost:r[g.result]?r.budget/r[g.result]*(g.cost==='cpm'?1000:1):null,reached:r.reached}));
+  return recs.map(r=>({rec:r,v:r.v,art:r.v.art,day:r.v.day,product:PRODUCT_BY_ID[r.v.product].short,scenario:r.v.scenario,offer:r.v.offer,platform:r.v.platform,blogger:r.v.blogger,account:r.v.account,channel:r.v.channel,stream:r.v.stream,dest:r.v.dest,daysIn:r.daysIn,budget:r.budget,views:r.views,clicks:r.clicks,orders:r.orders,likes:r.likes,comments:r.comments,reposts:r.reposts,saves:r.saves,result:r[g.result],cost:r[g.result]?r.budget/r[g.result]*(g.cost==='cpm'?1000:1):null,reached:r.reached}));
 }
 function videoTable(recs,screen,{compact=false,page=null,limit=null}={}){
   const g=G();const c=state.cols;
@@ -982,7 +998,8 @@ function videoTable(recs,screen,{compact=false,page=null,limit=null}={}){
     {k:'platform',l:'Площадка',render:r=>pfDot(r.platform)+r.platform,on:c.platform},
     {k:'blogger',l:'Блогер',on:c.blogger},
     {k:'account',l:'Аккаунт',on:c.account},
-    {k:'campaign',l:'Кампания',on:c.campaign},
+    {k:'channel',l:'Направление',on:c.channel},
+    {k:'stream',l:'Поток',on:c.stream},
     {k:'dest',l:'Куда ведёт',render:r=>destPill(r.dest),on:c.dest},
     {k:'daysIn',l:'Дней',num:true,render:r=>state.mode==='cohort'?`${r.daysIn} / ${state.cp}`:String(r.daysIn),on:c.days},
     {k:'budget',l:'Бюджет',num:true,render:r=>money(r.budget),on:c.budget},
@@ -1003,7 +1020,7 @@ function videoTable(recs,screen,{compact=false,page=null,limit=null}={}){
 }
 function renderVideos(ctx){
   const {recs,vs,sum}=ctx;const g=G();
-  const picks=[['date','Дата'],['platform','Площадка'],['product','Товар'],['scenario','Сценарий'],['offer','Оффер'],['blogger','Блогер'],['account','Аккаунт'],['campaign','Кампания'],['dest','Куда ведёт'],['days','Дней'],['budget','Бюджет'],['views','Просмотры'],['clicks','Переходы'],['orders','Заказы'],['likes','Лайки'],['comments','Комментарии'],['reposts','Репосты'],['saves','Сохранения']];
+  const picks=[['date','Дата'],['platform','Площадка'],['product','Товар'],['scenario','Сценарий'],['offer','Оффер'],['blogger','Блогер'],['account','Аккаунт'],['channel','Направление'],['stream','Поток'],['dest','Куда ведёт'],['days','Дней'],['budget','Бюджет'],['views','Просмотры'],['clicks','Переходы'],['orders','Заказы'],['likes','Лайки'],['comments','Комментарии'],['reposts','Репосты'],['saves','Сохранения']];
   const colpick=`<div class="colpick"><span class="note">Колонки:</span>${picks.map(([k,l])=>`<button type="button" class="chip ${state.cols[k]?'on':''}" data-act="col" data-v="${k}">${l}</button>`).join('')}</div>`;
   let detail='';
   if(state.sel.video){
@@ -1011,7 +1028,7 @@ function renderVideos(ctx){
     if(r){
       const v=r.v;const maxD=Math.min(LIFE,LAST-v.day+1);const vv=[],cc=[],labels=[];
       for(let d=0;d<maxD;d++){vv.push(v.vD[d]);cc.push(v[g.daily][d]);labels.push((d%5===0||d===maxD-1)?String(d+1):'')}
-      detail=card(`Ролик ${v.art}`,`<div class="kv"><div><div class="k">Вышел</div><div class="v">${fmtDL(v.day)}</div></div><div><div class="k">Блогер</div><div class="v">${esc(v.blogger)}</div></div><div><div class="k">Аккаунт</div><div class="v">${esc(v.account)}</div></div><div><div class="k">Площадка</div><div class="v">${pfDot(v.platform)}${v.platform}</div></div><div><div class="k">Товар</div><div class="v">${PRODUCT_BY_ID[v.product].short}</div></div><div><div class="k">Сценарий</div><div class="v">${esc(v.scenario)}</div></div><div><div class="k">Кампания</div><div class="v">${esc(v.campaign)}</div></div><div><div class="k">Куда ведёт</div><div class="v">${destPill(v.dest)}</div></div><div><div class="k">Бюджет</div><div class="v">${money(v.budget)}</div></div><div><div class="k">За всё время</div><div class="v">${fmt(v.total)} просм. · ${fmt(v.clicks)} перех. · ${fmt(v.orders)} зак.</div></div><div><div class="k">Вовлечённость</div><div class="v">${fmt(v.likes)} лайков · ${fmt(v.comments)} комм. · ${fmt(v.reposts)} репостов · ${fmt(v.saves)} сохр.</div></div></div>
+      detail=card(`Ролик ${v.art}`,`<div class="kv"><div><div class="k">Вышел</div><div class="v">${fmtDL(v.day)}</div></div><div><div class="k">Блогер</div><div class="v">${esc(v.blogger)}</div></div><div><div class="k">Аккаунт</div><div class="v">${esc(v.account)}</div></div><div><div class="k">Площадка</div><div class="v">${pfDot(v.platform)}${v.platform}</div></div><div><div class="k">Товар</div><div class="v">${PRODUCT_BY_ID[v.product].short}</div></div><div><div class="k">Сценарий</div><div class="v">${esc(v.scenario)}</div></div><div><div class="k">Направление</div><div class="v">${esc(v.channel)}</div></div><div><div class="k">Поток</div><div class="v">${esc(v.stream)}</div></div><div><div class="k">Куда ведёт</div><div class="v">${destPill(v.dest)}</div></div><div><div class="k">Бюджет</div><div class="v">${money(v.budget)}</div></div><div><div class="k">За всё время</div><div class="v">${fmt(v.total)} просм. · ${fmt(v.clicks)} перех. · ${fmt(v.orders)} зак.</div></div><div><div class="k">Вовлечённость</div><div class="v">${fmt(v.likes)} лайков · ${fmt(v.comments)} комм. · ${fmt(v.reposts)} репостов · ${fmt(v.saves)} сохр.</div></div></div>
         <div class="two"><div><div class="flabel" style="margin-bottom:6px">Просмотры по дням после выхода</div>${columns({vals:vv,labels,W:460,H:160,fmtV:fmtK,color:'var(--series-budget)'})}</div><div><div class="flabel" style="margin-bottom:6px">${g.resultLabel} по дням после выхода</div>${columns({vals:cc,labels,W:460,H:160,fmtV:fmt})}</div></div>`,{span:12,act:`<button type="button" class="linkbtn" data-act="selVideo" data-v="">Закрыть</button>`});
     }
   }
@@ -1065,7 +1082,7 @@ function execVerdict(s,p){
 }
 function movers(recs,prevRecs){
   const g=G();const out=[];
-  for(const [dim,screen] of [['platform','drivers'],['product','products'],['scenario','drivers'],['offer','drivers']]){
+  for(const [dim,screen] of [['channel','drivers'],['platform','drivers'],['product','products'],['scenario','drivers'],['offer','drivers']]){
     const pv=new Map(groupBy(prevRecs,DIMS[dim].key).map(x=>[x.key,x.s]));
     for(const x of groupBy(recs,DIMS[dim].key)){const p=pv.get(x.key)||null;const d=x.s[g.result]-(p?p[g.result]:0);if(!d)continue;out.push({dim,screen,key:x.key,name:dimName(dim,x.key),d,cur:x.s,prev:p})}
   }
@@ -1132,6 +1149,19 @@ function effCard(s,p){
     ${dumbbell({now:eff,was:peff,target:null,fmtV:v=>mf(g.eff,v),lowerBetter:false})}
     <div class="verdict" style="font-size:15px">${effSentence(s,p)}</div>`;
 }
+function cmpCols(g,maxB,maxR,nameLabel,sortable=true){
+  const sb=sortable?{}:{sortable:false};
+  return [
+    Object.assign({k:'name',l:nameLabel},sb),
+    {k:'status',l:'Решение',render:r=>pill(DECISION[r.status][1],DECISION[r.status][0]),sortable:false},
+    Object.assign({k:'n',l:'Роликов',num:true,render:r=>`<div class="cell2"><span>${fmt(r.n)}</span><span class="w">было ${r.pn==null?'—':fmt(r.pn)}</span></div>`},sb),
+    Object.assign({k:'budget',l:'Бюджет',num:true,render:r=>`<div class="cell2">${mini(r.budget,r.pbudget,maxB)}<span>${money(r.budget)}</span><span class="w">было ${r.pbudget==null?'—':money(r.pbudget)}</span></div>`},sb),
+    Object.assign({k:'result',l:g.resultLabel,num:true,render:r=>`<div class="cell2">${mini(r.result,r.presult,maxR)}<span>${fmt(r.result)}</span><span class="w">было ${r.presult==null?'—':fmt(r.presult)}</span></div>`},sb),
+    Object.assign({k:'cost',l:g.costLabel,num:true,render:r=>`<div class="cell2">${costSpan(r.cost)}<span class="w">было ${mf(g.cost,r.pcost)}</span>${dpill(r.cost,r.pcost,g.cost)}</div>`},sb),
+    Object.assign({k:'eff',l:g.effLabel,num:true,render:r=>`<div class="cell2"><span>${mf(g.eff,r.eff)}</span><span class="w">было ${mf(g.eff,r.peff)}</span></div>`},sb)
+  ];
+}
+function withPrev(x,p,g){return Object.assign(x,{n:x.s.n,pn:p?p.n:null,budget:x.s.budget,pbudget:p?p.budget:null,presult:p?p[g.result]:null,pcost:p?p[g.cost]:null,peff:p?p[g.eff]:null})}
 function renderExec(ctx){
   const {sum,prev,recs,prevRecs,len}=ctx;const g=G();const has=prev.n>0;
   const mv=movers(recs,prevRecs);
@@ -1139,31 +1169,38 @@ function renderExec(ctx){
   const mvHtml=mv.length?`<div class="insights">${mv.map((m,i)=>{const up=m.d>0;const cc=m.cur[g.cost],pc=m.prev?m.prev[g.cost]:null;return `<button type="button" class="insight" data-act="go" data-i="${i}"><span class="stripe" style="--c:${up?'var(--good-text)':'var(--crit-text)'}"></span><span><div class="t">${DIMS[m.dim].label} «${esc(m.name)}»</div><div class="m">${g.costLabel} ${mf(g.cost,cc)}${pc!=null?' против '+mf(g.cost,pc):''} · ${m.cur.n} ${plural(m.cur.n,'ролик','ролика','роликов')}${m.prev?' (было '+m.prev.n+')':''}</div></span><span class="impact">${g.resultGen}<b style="color:${up?'var(--good-text)':'var(--crit-text)'}">${up?'+':'−'}${fmt(Math.abs(m.d))}</b></span></button>`}).join('')}</div>`:'<div class="empty">Нет изменений относительно прошлого периода</div>';
   // products: this period vs previous
   const pv=new Map(groupBy(prevRecs,v=>v.product).map(x=>[x.key,x.s]));
-  const prods=enrich(groupBy(recs,v=>v.product),sum).map(x=>{const p=pv.get(x.key)||null;return Object.assign(x,{name:PRODUCT_BY_ID[x.key].short,n:x.s.n,pn:p?p.n:null,budget:x.s.budget,pbudget:p?p.budget:null,presult:p?p[g.result]:null,pcost:p?p[g.cost]:null,peff:p?p[g.eff]:null})});
+  const prods=enrich(groupBy(recs,v=>v.product),sum).map(x=>Object.assign(withPrev(x,pv.get(x.key)||null,g),{name:PRODUCT_BY_ID[x.key].short}));
   const maxB=Math.max(...prods.map(x=>Math.max(x.budget,x.pbudget||0)),1e-9),maxR=Math.max(...prods.map(x=>Math.max(x.result,x.presult||0)),1e-9);
-  const cols=[
-    {k:'name',l:'Товар'},
-    {k:'status',l:'Решение',render:r=>pill(DECISION[r.status][1],DECISION[r.status][0]),sortable:false},
-    {k:'n',l:'Роликов',num:true,render:r=>`<div class="cell2"><span>${fmt(r.n)}</span><span class="w">было ${r.pn==null?'—':fmt(r.pn)}</span></div>`},
-    {k:'budget',l:'Бюджет',num:true,render:r=>`<div class="cell2">${mini(r.budget,r.pbudget,maxB)}<span>${money(r.budget)}</span><span class="w">было ${r.pbudget==null?'—':money(r.pbudget)}</span></div>`},
-    {k:'result',l:g.resultLabel,num:true,render:r=>`<div class="cell2">${mini(r.result,r.presult,maxR)}<span>${fmt(r.result)}</span><span class="w">было ${r.presult==null?'—':fmt(r.presult)}</span></div>`},
-    {k:'cost',l:g.costLabel,num:true,render:r=>`<div class="cell2">${costSpan(r.cost)}<span class="w">было ${mf(g.cost,r.pcost)}</span>${dpill(r.cost,r.pcost,g.cost)}</div>`},
-    {k:'eff',l:g.effLabel,num:true,render:r=>`<div class="cell2"><span>${mf(g.eff,r.eff)}</span><span class="w">было ${mf(g.eff,r.peff)}</span></div>`}
-  ];
+  const cols=cmpCols(g,maxB,maxR,'Товар');
   const prodTbl=table(cols,sortRows(prods,'exec','budget'),{screen:'exec',rowAttr:r=>`class="rowbtn" data-act="goProduct" data-v="${r.key}"`});
-  // platforms: funnel + offer types
-  const ppv=new Map(groupBy(prevRecs,v=>v.platform).map(x=>[x.key,x.s]));
-  const pfs=enrich(groupBy(recs,v=>v.platform),sum).sort((a,b)=>b.s.budget-a.s.budget);
-  const pfCards=pfs.map(x=>{
-    const p=ppv.get(x.key)||null;
-    const offers=enrich(groupBy(x.list,v=>v.offer),x.s).sort((a,b)=>(a.cost==null?1e12:a.cost)-(b.cost==null?1e12:b.cost));
-    const row=(l,k,f,key)=>`<div class="k">${l}</div><div class="c">${f(x.s[k])}</div><div class="w">${p?'было '+f(p[k])+' '+dword(x.s[k],p[k],key):''}</div>`;
-    const chip=(l,k)=>`<span class="mchip">${l} <b>${mf(k,x.s[k])}</b>${p?`<span class="was">было ${mf(k,p[k])}</span>`:''}</span>`;
-    return card(`${pfDot(x.key)}${x.key}`,`<div style="display:flex;align-items:baseline;gap:10px;flex-wrap:wrap"><span class="big">${fmt(x.result)}</span><span class="note">${g.resultGen} · ${pct(x.rShare)} от всех</span><span style="margin-left:auto">${pill(DECISION[x.status][1],DECISION[x.status][0])}</span></div>
-      <div class="rows">${row('Бюджет','budget',money,'neutral')}${row('Роликов','n',fmt,'neutral')}${row('Просмотры','views',fmt,'views')}${row('Переходы','clicks',fmt,'clicks')}${row('Заказы','orders',fmt,'orders')}</div>
-      <div class="fs-conv" style="padding-left:0">${chip('CPM','cpm')}${chip('CTR','ctr')}${chip('CR','cr')}${chip('ER','er')}</div>
-      <div class="flabel">Типы офферов</div><div class="sublist">${offers.map(o=>`<div class="it"><span>${esc(o.key)}<div class="note">${o.s.n} ${plural(o.s.n,'ролик','ролика','роликов')} · ${pct(o.bShare)} бюджета площадки</div></span><span class="n">${fmt(o.result)} ${g.resultGen} · ${g.costLabel} ${mf(g.cost,o.cost)}</span></div>`).join('')}</div>`,{span:4,hint:p?'':'прошлого периода нет'});
-  }).join('');
+  // main split: the one comparison the client manages budget by
+  const dim=resolveSplit(recs);const dimLabel=DIMS[dim].label;
+  const spv=new Map(groupBy(prevRecs,DIMS[dim].key).map(x=>[x.key,x.s]));
+  const sg=enrich(groupBy(recs,DIMS[dim].key),sum).sort((a,b)=>b.s.budget-a.s.budget);
+  const splitBar=`<section class="card span-12" style="flex-direction:row;align-items:center;gap:12px;flex-wrap:wrap"><span class="flabel">Главный разрез</span>${seg(SPLIT_OPTIONS.map(([v,l])=>({v,l})),state.split,'split')}<span class="note" style="margin-left:auto">${state.split==='auto'?'авто: '+dimLabel.toLowerCase()+', по нему клиент делит бюджет':'выбрано вручную: '+dimLabel.toLowerCase()}</span></section>`;
+  let splitHtml='';
+  if(sg.length<=6){
+    const span=sg.length<=2?6:sg.length===4?3:4;
+    splitHtml=sg.map(x=>{
+      const p=spv.get(x.key)||null;
+      const sub=(dim==='channel'&&x.key==='Сетка')?'platform':SUB_DIM[dim];
+      const subs=enrich(groupBy(x.list,DIMS[sub].key),x.s).sort((a,b)=>(a.cost==null?1e12:a.cost)-(b.cost==null?1e12:b.cost));
+      const row=(l,k,f,key)=>`<div class="k">${l}</div><div class="c">${f(x.s[k])}</div><div class="w">${p?'было '+f(p[k])+' '+dword(x.s[k],p[k],key):''}</div>`;
+      const chip=(l,k)=>`<span class="mchip">${l} <b>${mf(k,x.s[k])}</b>${p?`<span class="was">было ${mf(k,p[k])}</span>`:''}</span>`;
+      return card(`${dim==='platform'?pfDot(x.key):''}${esc(dimName(dim,x.key))}`,`<div style="display:flex;align-items:baseline;gap:10px;flex-wrap:wrap"><span class="big">${fmt(x.result)}</span><span class="note">${g.resultGen} · ${pct(x.rShare)} от всех</span><span style="margin-left:auto">${pill(DECISION[x.status][1],DECISION[x.status][0])}</span></div>
+        <div class="rows">${row('Бюджет','budget',money,'neutral')}${row('Роликов','n',fmt,'neutral')}${row('Просмотры','views',fmt,'views')}${row('Переходы','clicks',fmt,'clicks')}${row('Заказы','orders',fmt,'orders')}</div>
+        <div class="fs-conv" style="padding-left:0">${chip('CPM','cpm')}${chip('CTR','ctr')}${chip('CR','cr')}${chip('ER','er')}</div>
+        <div class="flabel">По ${SUB_GEN[sub]}</div><div class="sublist">${subs.map(o=>`<div class="it"><span>${sub==='platform'?pfDot(o.key):''}${esc(dimName(sub,o.key))}<div class="note">${o.s.n} ${plural(o.s.n,'ролик','ролика','роликов')} · ${pct(o.bShare)} бюджета</div></span><span class="n">${fmt(o.result)} ${g.resultGen} · ${g.costLabel} ${mf(g.cost,o.cost)}</span></div>`).join('')}</div>`,{span,hint:p?'':'прошлого периода нет'});
+    }).join('');
+  }else{
+    const sorted=sg.slice().sort((a,b)=>b.result-a.result);const top=sorted.slice(0,5),rest=sorted.slice(5);
+    const restKeys=new Set(rest.map(x=>x.key));
+    const restList=rest.flatMap(x=>x.list);const restPrev=prevRecs.filter(r=>restKeys.has(DIMS[dim].key(r.v)));
+    const list=top.map(x=>Object.assign(withPrev(x,spv.get(x.key)||null,g),{name:dimName(dim,x.key)}));
+    if(restList.length){const r=enrich([{key:'rest',list:restList,s:sumRecs(restList)}],sum)[0];list.push(Object.assign(withPrev(r,restPrev.length?sumRecs(restPrev):null,g),{name:`Остальные (${rest.length})`}))}
+    const mB=Math.max(...list.map(x=>Math.max(x.budget,x.pbudget||0)),1e-9),mR=Math.max(...list.map(x=>Math.max(x.result,x.presult||0)),1e-9);
+    splitHtml=card(`${dimLabel}: топ-5 по ${g.resultDat} и остальные`,table(cmpCols(g,mB,mR,dimLabel,false),list,{screen:'execsplit'}),{span:12,hint:'серая полоска: прошлый период · полный список на экране «'+(dim==='blogger'?'Блогеры':'Драйверы')+'»'});
+  }
   const {ps,pe}=ctx;
   const sub=`${fmtDL(state.start)} – ${fmtDL(state.end)}${has?` против ${fmtDL(Math.max(0,ps))} – ${fmtDL(pe)}`:' · прошлого периода для сравнения нет'} · ${state.mode==='calendar'?'календарный режим':'по дате выхода, '+state.cp+' дн.'}`;
   return topbar('Бизнес-обзор',sub)+`<div class="grid">
@@ -1172,7 +1209,8 @@ function renderExec(ctx){
     ${card('Что изменило картину',mvHtml,{span:5,hint:'куда копать дальше · клик открывает детали'})}
     ${card('Воронка: этот и прошлый период',cmpFunnel(sum,prev),{span:12,hint:'между ступенями: CPM, ER, CTR, CR, ДРР'})}
     ${card('Товары: что рекламировать',prodTbl,{span:12,hint:'серая полоска: прошлый период · клик по строке открывает товар'})}
-    ${pfCards}
+    ${splitBar}
+    ${splitHtml}
   </div>`;
 }
 </script>
@@ -1187,13 +1225,15 @@ function renderSidebar(){
   const cr=cmpRange();const cmpNote=`Сравнение с ${fmtD(Math.max(0,cr.ps))} – ${fmtD(cr.pe)}${state.preset==='month'?': те же дни прошлого месяца':state.preset==='prevmonth'?': полный предыдущий месяц':': предыдущий период той же длины'}`;
   document.getElementById('filters').innerHTML=`<div class="fwrap">
     <div class="fsec"><div class="flabel">Главная метрика клиента</div>${seg([{v:'clicks',l:'Переходы'},{v:'reach',l:'Охват'},{v:'orders',l:'Заказы'}],state.goal,'goal','full')}<div class="note">Результат: ${g.resultLabel.toLowerCase()} · стоимость: ${g.costLabel} · эффективность: ${g.effLabel}</div></div>
+    <div class="fsec"><div class="flabel">Главный разрез</div>${seg(SPLIT_OPTIONS.map(([v,l])=>({v,l})),state.split,'split','full')}<div class="note">Единственное сравнение на бизнес-обзоре. Авто: направление, если их несколько, иначе площадка, оффер, блогер.</div></div>
     <div class="fsec"><div class="flabel">Период</div>${seg([{v:'month',l:'Текущий месяц'},{v:'prevmonth',l:'Прошлый месяц'}],state.preset,'preset','full')}${seg([{v:7,l:'7 дн.'},{v:14,l:'14 дн.'},{v:31,l:'31 дн.'}],state.preset,'preset','full')}<div class="row2"><input type="date" data-act="start" value="${isoOf(state.start)}" min="${isoOf(0)}" max="${isoOf(LAST)}" aria-label="Начало периода"><input type="date" data-act="end" value="${isoOf(state.end)}" min="${isoOf(0)}" max="${isoOf(LAST)}" aria-label="Конец периода"></div><div class="note">${cmpNote}</div><div class="note">Данные демо: 20 июля – 6 октября 2026</div></div>
     <div class="fsec"><div class="flabel">Режим</div>${seg([{v:'calendar',l:'Календарь'},{v:'cohort',l:'По дате выхода'}],state.mode,'mode','full')}<div class="tgt"><span>Точка</span><input type="number" data-act="cp" value="${state.cp}" min="1" max="30" step="1" aria-label="Контрольная точка, дней"></div><div class="note">${state.mode==='calendar'?'Что происходило в эти даты. Контрольная точка нужна для статуса «ноль после точки».':'Ролики, вышедшие в период, и первые N дней жизни каждого.'}</div></div>
     <div class="fsec"><div class="flabel">Цели клиента</div><div class="tgt"><span class="${g.target==='cpc'?'on':''}">CPC</span><input type="number" data-act="target" data-k="cpc" value="${state.targets.cpc}" min="1" step="10" aria-label="Целевой CPC"><span class="${g.target==='cpm'?'on':''}">CPM</span><input type="number" data-act="target" data-k="cpm" value="${state.targets.cpm}" min="1" step="5" aria-label="Целевой CPM"><span class="${g.target==='cpo'?'on':''}">CPO</span><input type="number" data-act="target" data-k="cpo" value="${state.targets.cpo}" min="1" step="50" aria-label="Целевой CPO"></div><div class="note">Статусы и подсветка считаются от цели активной метрики.</div></div>
     <div class="fsec"><div class="flabel">Площадка</div>${chips('platform',PLATFORMS)}</div>
     <div class="fsec"><div class="flabel">Товар</div>${chips('product',PRODUCTS.map(p=>p.id),k=>PRODUCT_BY_ID[k].short)}</div>
     <div class="fsec"><div class="flabel">Куда ведёт</div>${chips('dest',DESTS)}</div>
-    <div class="fsec"><div class="flabel">Кампания</div>${chips('campaign',CAMPAIGNS)}</div>
+    <div class="fsec"><div class="flabel">Направление</div>${chips('channel',CHANNELS)}</div>
+    <div class="fsec"><div class="flabel">Поток марафона</div>${chips('stream',STREAMS)}</div>
     <div class="fsec"><div class="flabel">Сценарий</div>${chips('scenario',SCENARIOS.map(s=>s.name))}</div>
     <div class="fsec"><div class="flabel">Оффер</div>${chips('offer',OFFERS.map(o=>o.name))}</div>
     <div class="fsec"><div class="flabel">Блогер</div><select data-act="blogger" aria-label="Блогер"><option value="">Все блогеры</option>${bl.map(b=>`<option value="${esc(b.name)}" ${f.blogger===b.name?'selected':''}>${esc(b.name)}</option>`).join('')}</select></div>
@@ -1226,6 +1266,7 @@ document.addEventListener('click',e=>{
     case 'back':goBack();return;
     case 'togglesb':document.getElementById('sidebar').classList.toggle('open');return;
     case 'goal':state.goal=v;state.sort={};break;
+    case 'split':state.split=v;break;
     case 'preset':{
       if(v==='month'){const ms=monthStartIdx(LAST);state.start=ms;state.end=LAST;const pms=monthStartIdx(ms-1);state.cmp={start:pms,end:Math.min(pms+(LAST-ms),monthEndIdx(ms-1))};state.preset='month'}
       else if(v==='prevmonth'){const ms=monthStartIdx(LAST);const pe=ms-1,ps=monthStartIdx(pe);state.start=ps;state.end=pe;state.cmp={start:monthStartIdx(ps-1),end:ps-1};state.preset='prevmonth'}
@@ -1234,7 +1275,7 @@ document.addEventListener('click',e=>{
     case 'mode':state.mode=v;break;
     case 'chip':{const arr=state.f[el.dataset.k];const i=arr.indexOf(v);if(i>=0)arr.splice(i,1);else arr.push(v);state.page=1;break}
     case 'unfilter':{const k=el.dataset.k;if(k==='blogger')state.f.blogger='';else{const arr=state.f[k];const i=arr.indexOf(v);if(i>=0)arr.splice(i,1)}state.page=1;break}
-    case 'reset':state.f={platform:[],product:[],dest:[],campaign:[],scenario:[],offer:[],blogger:''};state.page=1;break;
+    case 'reset':state.f={platform:[],product:[],dest:[],channel:[],stream:[],scenario:[],offer:[],blogger:''};state.page=1;break;
     case 'dim':state.dim=v;delete state.sort.drivers;break;
     case 'paretoBy':state.paretoBy=v;break;
     case 'selProduct':state.sel.product=v;break;
