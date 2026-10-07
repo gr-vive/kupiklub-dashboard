@@ -1333,7 +1333,7 @@ function reasonsSimple(ctx){
 function renderExec2(ctx){
   const {sum,prev,ps,pe}=ctx;const has=prev.n>0;
   const sub=`простая версия · ${fmtDL(state.start)} – ${fmtDL(state.end)}${has?` против ${fmtDL(Math.max(0,ps))} – ${fmtDL(pe)}`:' · прошлого периода для сравнения нет'}`;
-  return topbar('Бизнес-обзор',sub)+`<div class="grid">${verdictBar(sum,prev)}${funnelSimple(sum,prev)}${splitSimple(ctx)}${productsSimple(ctx)}${reasonsSimple(ctx)}</div>`;
+  return topbar('Бизнес-обзор',sub)+`<div class="grid">${verdictBar(sum,prev)}${tiles4(sum,prev)}${splitSimple(ctx)}${productsSimple(ctx)}${reasonsSimple(ctx)}${card("Воронка: этот и прошлый период",cmpFunnel(sum,prev),{span:12,hint:"между ступенями: CPM, ER, CTR, CR, ДРР"})}</div>`;
 }
 </script>
 <script>
